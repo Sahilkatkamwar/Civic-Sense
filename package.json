@@ -1,0 +1,14 @@
+{
+  "name": "civic-sense",
+  "version": "1.0.0",
+  "description": "Civic Sense - Municipal Issue Reporting, Intelligent Duplicate Triaging & Public Tracking Portal",
+  "scripts": {
+    "dev:server": "cd server && node index.js",
+    "dev:client": "cd client && npm run dev",
+    "build:client": "cd client && npm run build",
+    "test:api": "node server/test_api.js",
+    "test:db": "node server/test_db.js"
+  },
+  "author": "Civic Sense Team",
+  "license": "MIT"
+}
