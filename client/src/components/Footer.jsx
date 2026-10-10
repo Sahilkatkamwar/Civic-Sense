@@ -31,7 +31,7 @@ export default function Footer() {
             </div>
 
             <div className="footer-col">
-              <h4>Core Features</h4>
+              <h4>Core Capabilities</h4>
               <ul>
                 <li><span>Perceptual Hash Duplicate Detection</span></li>
                 <li><span>Algorithmic Dynamic Priority Score</span></li>
@@ -39,21 +39,11 @@ export default function Footer() {
                 <li><span>Citizen Verification & Tracking</span></li>
               </ul>
             </div>
-
-            <div className="footer-col">
-              <h4>Hackathon Team</h4>
-              <ul className="team-list">
-                <li><strong>Sahil</strong> &bull; Team Lead / Foundation & Integration</li>
-                <li><strong>Sujal</strong> &bull; Issue Explorer Module</li>
-                <li><strong>Tanush</strong> &bull; Complaint Submission & Priority</li>
-                <li><strong>Gagare</strong> &bull; Content & Demo Validation</li>
-              </ul>
-            </div>
           </div>
         </div>
 
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} Civic Sense &mdash; Built with pride for the Hackathon.</p>
+          <p>&copy; {new Date().getFullYear()} Civic Sense &mdash; Citizen Municipal Issue Resolution Portal.</p>
           <div className="footer-badge">
             <span className="live-dot"></span> System Live & Operational
           </div>
@@ -70,7 +60,7 @@ export default function Footer() {
         }
         .footer-top {
           display: grid;
-          grid-template-columns: 1.2fr 2fr;
+          grid-template-columns: 1.2fr 1.5fr;
           gap: 3rem;
           padding-bottom: 2.5rem;
           border-bottom: 1px solid #1e293b;
@@ -92,8 +82,8 @@ export default function Footer() {
         }
         .footer-links-grid {
           display: grid;
-          grid-template-columns: 1fr 1.2fr 1.4fr;
-          gap: 2rem;
+          grid-template-columns: 1fr 1.2fr;
+          gap: 2.5rem;
         }
         .footer-col h4 {
           color: #ffffff;
@@ -119,9 +109,6 @@ export default function Footer() {
         .footer-col ul li a:hover {
           color: #38bdf8;
           text-decoration: none;
-        }
-        .team-list li strong {
-          color: #e2e8f0;
         }
         .footer-bottom {
           display: flex;
