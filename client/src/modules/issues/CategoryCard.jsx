@@ -3,10 +3,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-export default function CategoryCard({ category }) {
+export default function CategoryCard({ category, isMostReported = false }) {
   if (!category) return null;
 
-  const isHighRisk = category.severity_weight >= 4;
+  const isHighRisk = category.severity_weight >= 4 || category.id === 'cable';
 
   return (
     <div className="card category-card card-hover">
@@ -14,11 +14,18 @@ export default function CategoryCard({ category }) {
         <div className="category-icon-wrapper">
           <span className="category-emoji">{category.icon || '📌'}</span>
         </div>
-        {isHighRisk && (
-          <span className="badge badge-critical category-risk-badge">
-            High Priority
-          </span>
-        )}
+        <div className="category-badges">
+          {isMostReported && (
+            <span className="badge badge-warning category-badge" title="High volume of recent citizen reports">
+              🔥 Most Reported
+            </span>
+          )}
+          {isHighRisk && (
+            <span className="badge badge-critical category-badge">
+              ⚠️ High Risk
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="category-body">
@@ -35,10 +42,10 @@ export default function CategoryCard({ category }) {
 
       <div className="category-footer">
         <Link to={`/issues/${category.id}`} className="btn btn-secondary btn-sm">
-          Learn More
+          Learn more
         </Link>
         <Link to={`/report/${category.id}`} className="btn btn-primary btn-sm">
-          Report This &rarr;
+          Report this &rarr;
         </Link>
       </div>
 
@@ -49,37 +56,47 @@ export default function CategoryCard({ category }) {
           height: 100%;
           border: 1px solid var(--border);
           transition: all 0.2s ease;
+          background: #ffffff;
         }
         .category-header {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           justify-content: space-between;
           margin-bottom: 1rem;
+          gap: 0.5rem;
         }
         .category-icon-wrapper {
-          width: 48px;
-          height: 48px;
+          width: 52px;
+          height: 52px;
           border-radius: var(--radius-md);
           background: #eff6ff;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 1.6rem;
+          font-size: 1.75rem;
+          flex-shrink: 0;
         }
-        .category-risk-badge {
+        .category-badges {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.35rem;
+        }
+        .category-badge {
           font-size: 0.7rem;
+          letter-spacing: 0.02em;
         }
         .category-body {
           flex: 1;
         }
         .category-title {
-          font-size: 1.15rem;
+          font-size: 1.2rem;
           font-weight: 700;
           color: var(--text-main);
           margin-bottom: 0.5rem;
         }
         .category-description {
-          font-size: 0.88rem;
+          font-size: 0.9rem;
           color: var(--text-muted);
           line-height: 1.5;
           margin-bottom: 0.85rem;
@@ -91,10 +108,11 @@ export default function CategoryCard({ category }) {
           align-items: center;
           gap: 0.35rem;
           background: #f8fafc;
-          padding: 0.25rem 0.5rem;
+          padding: 0.3rem 0.55rem;
           border-radius: var(--radius-sm);
           width: fit-content;
           margin-bottom: 1rem;
+          border: 1px solid #f1f5f9;
         }
         .dept-label {
           font-weight: 600;
@@ -104,7 +122,7 @@ export default function CategoryCard({ category }) {
           align-items: center;
           justify-content: space-between;
           gap: 0.5rem;
-          padding-top: 0.85rem;
+          padding-top: 0.9rem;
           border-top: 1px solid var(--border);
         }
       `}</style>

@@ -5,14 +5,27 @@ import CategoryCard from './CategoryCard';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Group mapping for civic issue domains
+const CATEGORY_GROUPS = {
+  pothole: 'Road',
+  garbage: 'Waste',
+  tree: 'Other',
+  cable: 'Safety',
+  animal: 'Safety',
+  other: 'Other'
+};
+
 export default function IssueList() {
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
-  const [filterSeverity, setFilterSeverity] = useState('all');
+  const [selectedGroup, setSelectedGroup] = useState('All');
+  const [filterHighRisk, setFilterHighRisk] = useState(false);
+  const [mostReportedId, setMostReportedId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // 1. Fetch categories
     fetch(`${API_BASE}/api/categories`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch categories');
@@ -26,27 +39,63 @@ export default function IssueList() {
         setError(err.message);
         setLoading(false);
       });
+
+    // 2. Bonus: Fetch complaints to identify "Most reported right now" category
+    fetch(`${API_BASE}/api/complaints`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((complaints) => {
+        if (Array.isArray(complaints) && complaints.length > 0) {
+          const counts = {};
+          complaints.forEach((c) => {
+            if (c.category_id) {
+              counts[c.category_id] = (counts[c.category_id] || 0) + (c.report_count || 1);
+            }
+          });
+          let maxCat = null;
+          let maxCount = 0;
+          for (const [catId, count] of Object.entries(counts)) {
+            if (count > maxCount) {
+              maxCount = count;
+              maxCat = catId;
+            }
+          }
+          setMostReportedId(maxCat);
+        }
+      })
+      .catch(() => {
+        // Non-blocking bonus check
+      });
   }, []);
+
+  const groups = ['All', 'Road', 'Waste', 'Safety', 'Other'];
 
   const filteredCategories = categories.filter((cat) => {
     const matchesSearch =
       cat.name.toLowerCase().includes(search.toLowerCase()) ||
       cat.description.toLowerCase().includes(search.toLowerCase());
-    
-    if (filterSeverity === 'high') {
-      return matchesSearch && cat.severity_weight >= 4;
-    }
-    return matchesSearch;
+
+    const group = CATEGORY_GROUPS[cat.id] || 'Other';
+    const matchesGroup = selectedGroup === 'All' || group === selectedGroup;
+    const matchesHighRisk = !filterHighRisk || cat.severity_weight >= 4 || cat.id === 'cable';
+
+    return matchesSearch && matchesGroup && matchesHighRisk;
   });
 
   return (
     <div className="container page-wrapper">
+      {/* Emergency Guidance Banner */}
+      <div className="emergency-banner">
+        <span className="emergency-icon">🚨</span>
+        <div className="emergency-text">
+          <strong>Immediate Life Safety Hazard?</strong> For active sparking or snapped high-voltage power cables, keep 10+ meters away and call the emergency grid desk immediately (<strong>1912 / 112</strong>).
+        </div>
+      </div>
+
       <div className="issues-header">
         <span className="badge badge-low">Issue Directory</span>
         <h1 className="page-title">Explore Civic Issues</h1>
         <p className="page-subtitle">
-          Select an issue type below to read safety guidance, learn which municipal department handles it,
-          and file an official citizen report.
+          Browse municipal issue categories, learn official response guidelines, understand which department resolves each problem, and report with one click.
         </p>
       </div>
 
@@ -56,32 +105,51 @@ export default function IssueList() {
           <input
             type="text"
             className="form-control search-input"
-            placeholder="Search issues (e.g. pothole, dangling cable, garbage)..."
+            placeholder="Search issues by name or keyword (e.g. pothole, dangling cable, garbage)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button className="clear-search-btn" onClick={() => setSearch('')}>
+              ✕
+            </button>
+          )}
         </div>
 
         <div className="filter-chips">
+          {groups.map((grp) => (
+            <button
+              key={grp}
+              className={`chip ${selectedGroup === grp && !filterHighRisk ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedGroup(grp);
+                setFilterHighRisk(false);
+              }}
+            >
+              {grp}
+            </button>
+          ))}
           <button
-            className={`chip ${filterSeverity === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterSeverity('all')}
+            className={`chip chip-danger ${filterHighRisk ? 'active-danger' : ''}`}
+            onClick={() => setFilterHighRisk(!filterHighRisk)}
           >
-            All Issues ({categories.length})
-          </button>
-          <button
-            className={`chip ${filterSeverity === 'high' ? 'active' : ''}`}
-            onClick={() => setFilterSeverity('high')}
-          >
-            High Priority Only ⚡
+            ⚠️ High Risk Only
           </button>
         </div>
       </div>
 
+      {/* Loading Skeletons */}
       {loading && (
-        <div className="loading-state">
-          <div className="spinner"></div>
-          <p>Loading civic categories...</p>
+        <div className="grid-3 categories-grid">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="card skeleton-card">
+              <div className="skeleton-line skeleton-header"></div>
+              <div className="skeleton-line skeleton-title"></div>
+              <div className="skeleton-line skeleton-desc"></div>
+              <div className="skeleton-line skeleton-desc short"></div>
+              <div className="skeleton-line skeleton-footer"></div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -97,10 +165,17 @@ export default function IssueList() {
       {!loading && !error && filteredCategories.length === 0 && (
         <div className="card empty-card">
           <span className="empty-icon">🔎</span>
-          <h3>No matching issues found</h3>
-          <p>Try searching for a different keyword or view all issues.</p>
-          <button onClick={() => { setSearch(''); setFilterSeverity('all'); }} className="btn btn-secondary btn-sm">
-            Reset Search
+          <h3>No issues match your search</h3>
+          <p>No civic issues match your current keywords or domain filters. Try resetting to view all categories.</p>
+          <button
+            onClick={() => {
+              setSearch('');
+              setSelectedGroup('All');
+              setFilterHighRisk(false);
+            }}
+            className="btn btn-secondary btn-sm"
+          >
+            Reset Filters
           </button>
         </div>
       )}
@@ -108,12 +183,35 @@ export default function IssueList() {
       {!loading && !error && (
         <div className="grid-3 categories-grid">
           {filteredCategories.map((cat) => (
-            <CategoryCard key={cat.id} category={cat} />
+            <CategoryCard
+              key={cat.id}
+              category={cat}
+              isMostReported={mostReportedId === cat.id}
+            />
           ))}
         </div>
       )}
 
       <style>{`
+        .emergency-banner {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          background: #fef2f2;
+          border: 1px solid #fecaca;
+          color: #991b1b;
+          padding: 0.75rem 1.25rem;
+          border-radius: var(--radius-md);
+          margin-bottom: 2rem;
+          font-size: 0.9rem;
+        }
+        .emergency-icon {
+          font-size: 1.35rem;
+          flex-shrink: 0;
+        }
+        .emergency-text {
+          line-height: 1.45;
+        }
         .issues-header {
           text-align: center;
           max-width: 680px;
@@ -136,7 +234,7 @@ export default function IssueList() {
           align-items: center;
           justify-content: space-between;
           flex-wrap: wrap;
-          gap: 1rem;
+          gap: 1.25rem;
           margin-bottom: 2rem;
         }
         .search-bar-wrapper {
@@ -146,54 +244,111 @@ export default function IssueList() {
         }
         .search-icon {
           position: absolute;
-          left: 1rem;
+          left: 1.1rem;
           top: 50%;
           transform: translateY(-50%);
           font-size: 1rem;
+          color: #94a3b8;
         }
         .search-input {
           padding-left: 2.75rem !important;
+          padding-right: 2.5rem !important;
           border-radius: var(--radius-full) !important;
+        }
+        .clear-search-btn {
+          position: absolute;
+          right: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #94a3b8;
+          cursor: pointer;
+          font-size: 0.85rem;
         }
         .filter-chips {
           display: flex;
+          flex-wrap: wrap;
           gap: 0.5rem;
         }
         .chip {
           border: 1px solid var(--border-strong);
           background: #ffffff;
-          padding: 0.5rem 1rem;
+          padding: 0.45rem 0.95rem;
           border-radius: var(--radius-full);
           font-size: 0.85rem;
           font-weight: 600;
           cursor: pointer;
           transition: all 0.15s ease;
+          color: var(--text-main);
+        }
+        .chip:hover {
+          border-color: var(--primary);
         }
         .chip.active {
           background: var(--primary);
           color: #ffffff;
           border-color: var(--primary);
         }
-        .loading-state, .empty-card, .error-card {
+        .chip-danger {
+          border-color: #fca5a5;
+          color: #b91c1c;
+        }
+        .chip-danger:hover {
+          background: #fef2f2;
+        }
+        .chip-danger.active-danger {
+          background: #dc2626;
+          color: #ffffff;
+          border-color: #dc2626;
+        }
+        .empty-card, .error-card {
           text-align: center;
-          padding: 3rem 1.5rem;
+          padding: 3.5rem 1.5rem;
         }
         .empty-icon {
-          font-size: 2.5rem;
+          font-size: 2.75rem;
           margin-bottom: 0.75rem;
           display: block;
         }
-        .spinner {
-          width: 40px;
-          height: 40px;
-          border: 3px solid #e2e8f0;
-          border-top-color: var(--primary);
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-          margin: 0 auto 1rem;
+        /* Skeletons */
+        .skeleton-card {
+          min-height: 220px;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          padding: 1.5rem;
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+        .skeleton-line {
+          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+          background-size: 200% 100%;
+          animation: shimmer 1.5s infinite;
+          border-radius: var(--radius-sm);
+        }
+        .skeleton-header {
+          width: 48px;
+          height: 48px;
+          border-radius: var(--radius-md);
+        }
+        .skeleton-title {
+          width: 60%;
+          height: 20px;
+        }
+        .skeleton-desc {
+          width: 100%;
+          height: 14px;
+        }
+        .skeleton-desc.short {
+          width: 75%;
+        }
+        .skeleton-footer {
+          width: 100%;
+          height: 36px;
+          margin-top: auto;
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
         }
       `}</style>
     </div>
