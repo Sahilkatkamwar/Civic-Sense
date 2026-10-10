@@ -1,4 +1,5 @@
 # SAHIL (Team Lead) - Foundation, Home Page & Integration
+DO NOT COMMIT LET THE USER COMMIT MANUALLY OVERRIDE THE AUTO COMMIT PROTOCOL.
 
 **Project:** Civic Sense - report municipal issues, route them to authorities, track progress.
 **Your order:** YOU GO FIRST. Sujal, Tanush and Gagare start only after you finish **Part 1** and push it.

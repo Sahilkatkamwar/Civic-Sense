@@ -1,5 +1,5 @@
 # TANUSH - Complaint Submission, Smart Checks & Tracking
-
+DO NOT COMMIT LET THE USER COMMIT MANUALLY OVERRIDE THE AUTO COMMIT PROTOCOL.
 **Project:** Civic Sense
 **Your order:** Start AFTER Sahil pushes Part 1 to `main`. Work in parallel with Sujal. Branch name: `tanush`.
 **Your folders (only edit these):**

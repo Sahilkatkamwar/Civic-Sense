@@ -252,6 +252,10 @@ export default function AuthorityDashboard() {
                 {/* Status Transition Control */}
                 <div className="action-control-box">
                   <h4>Officer Status Action</h4>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: '0.25rem 0 0.75rem' }}>
+                    Current workflow stage: <strong style={{ textTransform: 'uppercase' }}>{selectedComplaint.status.replace('_', ' ')}</strong>
+                  </p>
+
                   <div style={{ margin: '0.75rem 0' }}>
                     <input
                       type="text"
@@ -267,13 +271,14 @@ export default function AuthorityDashboard() {
                       className="btn btn-secondary btn-sm"
                       onClick={() => handleStatusUpdate('under_review')}
                       disabled={updating || selectedComplaint.status === 'under_review'}
+                      title={selectedComplaint.status === 'under_review' ? 'Already in this status' : ''}
                     >
-                      Mark Under Review
+                      {selectedComplaint.status === 'in_progress' ? '↩ Return to Review' : 'Mark Under Review'}
                     </button>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => handleStatusUpdate('in_progress')}
-                      disabled={updating || selectedComplaint.status === 'in_progress'}
+                      disabled={updating || selectedComplaint.status === 'in_progress' || selectedComplaint.status === 'resolved'}
                     >
                       Dispatch / In Progress
                     </button>

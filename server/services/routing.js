@@ -3,7 +3,7 @@
 const VALID_TRANSITIONS = {
   submitted: ['under_review', 'in_progress', 'rejected'],
   under_review: ['in_progress', 'rejected'],
-  in_progress: ['resolved', 'rejected'],
+  in_progress: ['resolved', 'under_review', 'rejected'],
   rejected: ['under_review'],
   resolved: ['under_review']
 };

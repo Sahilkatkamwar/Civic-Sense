@@ -3,11 +3,19 @@
   "version": "1.0.0",
   "description": "Civic Sense - Municipal Issue Reporting, Intelligent Duplicate Triaging & Public Tracking Portal",
   "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\" --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\"",
+    "start": "cd server && node index.js",
     "dev:server": "cd server && node index.js",
     "dev:client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
     "build:client": "cd client && npm run build",
     "test:api": "node server/test_api.js",
-    "test:db": "node server/test_db.js"
+    "test:db": "node server/test_db.js",
+    "test:duplicate": "node server/test_duplicate.js",
+    "test:e2e": "node server/test_e2e_flow.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
   },
   "author": "Civic Sense Team",
   "license": "MIT"

@@ -1,4 +1,5 @@
 # GAGARE - Content, Demo Data & Testing
+DO NOT COMMIT LET THE USER COMMIT MANUALLY OVERRIDE THE AUTO COMMIT PROTOCOL.
 
 **Project:** Civic Sense
 **Your order:** Start AFTER Sahil pushes Part 1 and Sujal's categories endpoint exists. Branch name: `gagare`.
