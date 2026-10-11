@@ -1,28 +1,36 @@
 // client/src/modules/issues/CategoryCard.jsx
-// Owner: Sujal (Reused on Home page by Sahil)
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, Building2, AlertTriangle, Flame } from 'lucide-react';
+import { getCategoryConfig } from '../../utils/civicHelpers';
 
 export default function CategoryCard({ category, isMostReported = false }) {
   if (!category) return null;
 
+  const catConfig = getCategoryConfig(category.id);
+  const CatIcon = catConfig.icon;
   const isHighRisk = category.severity_weight >= 4 || category.id === 'cable';
 
   return (
     <div className="card category-card card-hover">
       <div className="category-header">
-        <div className="category-icon-wrapper">
-          <span className="category-emoji">{category.icon || '📌'}</span>
+        <div
+          className="category-icon-box"
+          style={{ backgroundColor: catConfig.bgColor, color: catConfig.color }}
+        >
+          <CatIcon size={22} />
         </div>
         <div className="category-badges">
-          {isMostReported && (
-            <span className="badge badge-warning category-badge" title="High volume of recent citizen reports">
-              🔥 Most Reported
+          {isHighRisk && (
+            <span className="badge badge-critical">
+              <AlertTriangle size={11} />
+              Severity {category.severity_weight}/5
             </span>
           )}
-          {isHighRisk && (
-            <span className="badge badge-critical category-badge">
-              ⚠️ High Risk
+          {isMostReported && (
+            <span className="badge badge-high">
+              <Flame size={11} />
+              High Volume
             </span>
           )}
         </div>
@@ -31,21 +39,19 @@ export default function CategoryCard({ category, isMostReported = false }) {
       <div className="category-body">
         <h3 className="category-title">{category.name}</h3>
         <p className="category-description">{category.description}</p>
-        
-        {category.authority_name && (
-          <div className="category-dept">
-            <span className="dept-label">Authority:</span>
-            <span className="dept-name">{category.authority_name}</span>
-          </div>
-        )}
+
+        <div className="category-dept-tag">
+          <Building2 size={12} className="text-slate-400" />
+          <span>{category.authority_name || catConfig.department}</span>
+        </div>
       </div>
 
       <div className="category-footer">
         <Link to={`/issues/${category.id}`} className="btn btn-secondary btn-sm">
-          Learn more
+          Safety Protocol
         </Link>
-        <Link to={`/report/${category.id}`} className="btn btn-primary btn-sm">
-          Report this &rarr;
+        <Link to={`/report/${category.id}`} className="btn btn-saffron btn-sm">
+          Lodge Grievance <ArrowRight size={13} />
         </Link>
       </div>
 
@@ -55,75 +61,71 @@ export default function CategoryCard({ category, isMostReported = false }) {
           flex-direction: column;
           height: 100%;
           border: 1px solid var(--border);
-          transition: all 0.2s ease;
+          transition: all var(--transition-fast);
           background: #ffffff;
+        }
+        .category-card:hover {
+          border-color: var(--primary-border);
+          box-shadow: var(--shadow-sm);
         }
         .category-header {
           display: flex;
           align-items: flex-start;
           justify-content: space-between;
-          margin-bottom: 1rem;
+          margin-bottom: 0.85rem;
           gap: 0.5rem;
         }
-        .category-icon-wrapper {
-          width: 52px;
-          height: 52px;
+        .category-icon-box {
+          width: 44px;
+          height: 44px;
           border-radius: var(--radius-md);
-          background: #eff6ff;
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 1.75rem;
           flex-shrink: 0;
         }
         .category-badges {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 0.35rem;
-        }
-        .category-badge {
-          font-size: 0.7rem;
-          letter-spacing: 0.02em;
+          gap: 0.3rem;
         }
         .category-body {
           flex: 1;
         }
         .category-title {
-          font-size: 1.2rem;
+          font-size: 1.05rem;
           font-weight: 700;
           color: var(--text-main);
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.35rem;
+          letter-spacing: -0.01em;
         }
         .category-description {
-          font-size: 0.9rem;
+          font-size: 0.825rem;
           color: var(--text-muted);
-          line-height: 1.5;
+          line-height: 1.45;
           margin-bottom: 0.85rem;
         }
-        .category-dept {
-          font-size: 0.775rem;
-          color: #64748b;
-          display: flex;
+        .category-dept-tag {
+          display: inline-flex;
           align-items: center;
           gap: 0.35rem;
-          background: #f8fafc;
-          padding: 0.3rem 0.55rem;
+          font-size: 0.72rem;
+          font-weight: 500;
+          color: var(--text-secondary);
+          background: var(--bg-subtle);
+          padding: 3px 8px;
           border-radius: var(--radius-sm);
-          width: fit-content;
           margin-bottom: 1rem;
-          border: 1px solid #f1f5f9;
-        }
-        .dept-label {
-          font-weight: 600;
+          border: 1px solid var(--border);
         }
         .category-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
           gap: 0.5rem;
-          padding-top: 0.9rem;
-          border-top: 1px solid var(--border);
+          padding-top: 0.85rem;
+          border-top: 1px solid var(--border-subtle);
         }
       `}</style>
     </div>

@@ -1,53 +1,55 @@
 // client/src/modules/report/TrackComplaint.jsx
-// Owner: Tanush (Complaint Tracking)
+// Real-Time Citizen Tracking & Timeline Audit
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+  Search,
+  CheckCircle2,
+  AlertOctagon,
+  MapPin,
+  ThumbsUp,
+  Camera,
+  History
+} from 'lucide-react';
+import {
+  getCategoryConfig,
+  getPriorityConfig,
+  getStatusConfig,
+  formatFullDateTime
+} from '../../utils/civicHelpers';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Fix for default Leaflet marker icons
+// Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 });
 
-const STATUS_ICONS = {
-  submitted: '📝',
-  under_review: '🔍',
-  in_progress: '🔧',
-  resolved: '✅',
-  rejected: '❌'
-};
-
-const STATUS_COLORS = {
-  submitted: '#64748b',
-  under_review: '#2563eb',
-  in_progress: '#d97706',
-  resolved: '#16a34a',
-  rejected: '#dc2626'
-};
+const PIPELINE_STEPS = [
+  { key: 'submitted', label: 'Submitted', sub: 'Logged to queue' },
+  { key: 'under_review', label: 'Under Review', sub: 'Assigned to field unit' },
+  { key: 'in_progress', label: 'In Progress', sub: 'Active repair crew' },
+  { key: 'resolved', label: 'Resolved', sub: 'Audited & closed' }
+];
 
 export default function TrackComplaint() {
   const { complaintId: urlComplaintId } = useParams();
   const navigate = useNavigate();
 
   const [searchId, setSearchId] = useState(urlComplaintId || '');
-  const [prevUrlId, setPrevUrlId] = useState(urlComplaintId);
   const [complaint, setComplaint] = useState(null);
   const [loading, setLoading] = useState(Boolean(urlComplaintId));
   const [error, setError] = useState(null);
   const [supporting, setSupporting] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
 
-  if (urlComplaintId !== prevUrlId) {
-    setPrevUrlId(urlComplaintId);
-    setSearchId(urlComplaintId || '');
-  }
+  const sampleIds = ['CS-2026-00001', 'CS-2026-00002', 'CS-2026-00003'];
 
   const fetchComplaint = (id) => {
     if (!id || !id.trim()) return;
@@ -61,7 +63,7 @@ export default function TrackComplaint() {
           if (res.status === 404) {
             throw new Error(`Complaint ID "${id}" was not found in our records. Please verify the format (e.g. CS-2026-00001).`);
           }
-          throw new Error('Unable to connect to complaint service.');
+          throw new Error('Unable to connect to municipal complaint service.');
         }
         return res.json();
       })
@@ -78,25 +80,8 @@ export default function TrackComplaint() {
 
   useEffect(() => {
     if (urlComplaintId) {
-      fetch(`${API_BASE}/api/complaints/${urlComplaintId.trim()}`)
-        .then((res) => {
-          if (!res.ok) {
-            if (res.status === 404) {
-              throw new Error(`Complaint ID "${urlComplaintId}" was not found in our records. Please verify the format (e.g. CS-2026-00001).`);
-            }
-            throw new Error('Unable to connect to complaint service.');
-          }
-          return res.json();
-        })
-        .then((data) => {
-          setComplaint(data);
-          setLoading(false);
-        })
-        .catch((err) => {
-          setError(err.message);
-          setComplaint(null);
-          setLoading(false);
-        });
+      setSearchId(urlComplaintId);
+      fetchComplaint(urlComplaintId);
     }
   }, [urlComplaintId]);
 
@@ -104,29 +89,23 @@ export default function TrackComplaint() {
     e.preventDefault();
     if (searchId.trim()) {
       navigate(`/track/${searchId.trim()}`);
-      fetchComplaint(searchId.trim());
     }
   };
 
-  // "I face this too" support handler
   const handleSupport = async () => {
-    if (!complaint || supporting) return;
+    if (!complaint) return;
     setSupporting(true);
     setSupportMsg('');
 
     try {
       const res = await fetch(`${API_BASE}/api/complaints/${complaint.id}/support`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        method: 'POST'
       });
-
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to add support');
+        throw new Error(data.error || 'Failed to add confirmation');
       }
-
-      setSupportMsg(data.message);
-      // Refresh complaint data
+      setSupportMsg(data.message || 'Thank you! Your confirmation has been counted.');
       fetchComplaint(complaint.id);
     } catch (err) {
       setSupportMsg(`Error: ${err.message}`);
@@ -135,199 +114,290 @@ export default function TrackComplaint() {
     }
   };
 
-  // Determine which timeline step is "active" (latest)
-  const getTimelineStepStyle = (step, idx, total) => {
-    const isLatest = idx === total - 1;
-    const color = STATUS_COLORS[step.status] || '#64748b';
-    return { color, isLatest };
-  };
+  const catConfig = complaint ? getCategoryConfig(complaint.category_id) : null;
+  const prioConfig = complaint ? getPriorityConfig(complaint.priority_level) : null;
+  const statConfig = complaint ? getStatusConfig(complaint.status) : null;
+  const CatIcon = catConfig ? catConfig.icon : null;
+  const StatIcon = statConfig ? statConfig.icon : null;
+
+  // Determine current step index
+  const currentStepIndex =
+    complaint?.status === 'resolved' ? 4 :
+    complaint?.status === 'in_progress' ? 3 :
+    complaint?.status === 'under_review' ? 2 :
+    complaint?.status === 'submitted' ? 1 :
+    0;
 
   return (
     <div className="container page-wrapper">
+      {/* Search Bar Header */}
       <div className="track-header">
-        <span className="badge badge-low">Citizen Verification</span>
-        <h1 className="page-title">Track Complaint Status</h1>
+        <div className="breadcrumb-row">
+          <span>नागरिक सेवाएं / Citizen Services</span>
+          <span>/</span>
+          <span className="text-slate-900 font-bold">शिकायत स्थिति जांच / Grievance Redressal Tracker</span>
+        </div>
+        <div className="gov-seal-box" style={{ marginBottom: '0.65rem' }}>
+          केन्द्रीय लोक शिकायत निवारण एवं निगरानी प्रणाली / CPGRAMS COMPLIANT
+        </div>
+        <h1 className="page-heading">Track Public Grievance Status (शिकायत स्थिति जांचें)</h1>
         <p className="page-subtitle">
-          Enter your unique tracking token to inspect live resolution progress, department actions, and priority history.
+          Official statutory grievance docket lookup. View verified photographic evidence, assigned municipal ward officer, and complete audited resolution lifecycle.
         </p>
-      </div>
 
-      <div className="track-search-box card">
-        <form onSubmit={handleSearchSubmit} className="search-form">
-          <input
-            type="text"
-            className="form-control track-input"
-            placeholder="Enter Complaint ID (e.g. CS-2026-00001)..."
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
-          />
-          <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Searching...' : '🔍 Track Status'}
+        {/* Search input form */}
+        <form onSubmit={handleSearchSubmit} className="track-search-form">
+          <div className="search-bar-wrap">
+            <Search size={18} className="search-bar-icon" />
+            <input
+              type="text"
+              className="search-bar-input"
+              placeholder="Enter Complaint ID (e.g., CS-2026-00001)..."
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+            />
+          </div>
+          <button type="submit" className="btn btn-primary btn-lg" disabled={loading}>
+            {loading ? 'Searching Registry...' : 'Track Status'}
           </button>
         </form>
+
+        {/* Sample quick tags */}
+        <div className="sample-tags-row">
+          <span className="sample-label">Sample Active Records:</span>
+          {sampleIds.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className="sample-tag-btn"
+              onClick={() => {
+                setSearchId(id);
+                navigate(`/track/${id}`);
+              }}
+            >
+              {id}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {loading && (
-        <div className="loading-state text-center" style={{ padding: '3rem' }}>
-          <div className="spinner"></div>
-          <p>Retrieving complaint records and status history...</p>
-        </div>
-      )}
-
+      {/* Error state */}
       {error && (
-        <div className="card error-card" style={{ maxWidth: '680px', margin: '2rem auto', textAlign: 'center' }}>
-          <span style={{ fontSize: '2.5rem', display: 'block', marginBottom: '0.75rem' }}>🔍❌</span>
-          <h3 style={{ color: '#991b1b', marginBottom: '0.5rem' }}>Complaint Not Found</h3>
-          <p style={{ color: 'var(--text-muted)', lineHeight: '1.6' }}>{error}</p>
-          <div style={{ marginTop: '1.25rem' }}>
+        <div className="card track-error-card">
+          <AlertOctagon size={28} className="text-red-500 mb-2" />
+          <h3 className="error-title">Incident Record Not Found</h3>
+          <p className="error-desc">{error}</p>
+          <div className="error-actions">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setSearchId('CS-2026-00001');
+                navigate('/track/CS-2026-00001');
+              }}
+            >
+              Try Sample Record CS-2026-00001
+            </button>
             <Link to="/report" className="btn btn-primary btn-sm">
-              File a New Complaint
+              Log a New Complaint
             </Link>
           </div>
         </div>
       )}
 
+      {/* Loading state */}
+      {loading && !complaint && (
+        <div className="text-center" style={{ padding: '4rem 0' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--text-muted)' }}>Retrieving incident telemetry from database...</p>
+        </div>
+      )}
+
+      {/* Complaint details */}
       {complaint && (
-        <div className="complaint-details card" style={{ maxWidth: '800px', margin: '2rem auto' }}>
-          {/* Header Bar */}
-          <div className="det-header">
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem', flexWrap: 'wrap' }}>
-                <span className="complaint-code">{complaint.id}</span>
-                <span className={`badge badge-${complaint.priority_level}`}>
-                  {complaint.priority_level} Priority (Score: {complaint.priority_score})
-                </span>
-                <span className={`badge badge-${complaint.status === 'resolved' ? 'success' : complaint.status === 'rejected' ? 'critical' : 'low'}`}>
-                  {STATUS_ICONS[complaint.status]} {complaint.status.replace('_', ' ')}
-                </span>
+        <div className="track-result-grid">
+          {/* Left Column: Progress Stepper, Metadata & Audit History */}
+          <div className="track-left-col">
+            {/* Status Stepper Card */}
+            <div className="card track-stepper-card">
+              <div className="stepper-header">
+                <div>
+                  <span className="stepper-id-label">Official Record Code</span>
+                  <div className="stepper-id-val">{complaint.id}</div>
+                </div>
+                <div className="stepper-status-badge" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span className={`badge ${prioConfig.badgeClass}`} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                    {prioConfig.label} ({complaint.priority_score || 0})
+                  </span>
+                  <span
+                    className="badge"
+                    style={{
+                      backgroundColor: statConfig.bgColor,
+                      color: statConfig.color,
+                      borderColor: statConfig.borderColor,
+                      fontSize: '0.8rem',
+                      padding: '4px 10px'
+                    }}
+                  >
+                    <StatIcon size={14} />
+                    {statConfig.label}
+                  </span>
+                </div>
               </div>
-              <span className="complaint-meta">
-                Filed on {new Date(complaint.created_at).toLocaleString()}
-              </span>
+
+              {/* Step indicator */}
+              <div className="stepper-progress-bar">
+                {PIPELINE_STEPS.map((step, idx) => {
+                  const isCompleted = currentStepIndex > idx + 1;
+                  const isCurrent = currentStepIndex === idx + 1;
+
+                  return (
+                    <div
+                      key={step.key}
+                      className={`step-milestone ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''}`}
+                    >
+                      <div className="step-circle">
+                        {isCompleted ? <CheckCircle2 size={16} /> : idx + 1}
+                      </div>
+                      <span className="step-label-main">{step.label}</span>
+                      <span className="step-label-sub">{step.sub}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            <div className="report-count-pill">
-              <span className="count-number">{complaint.report_count}</span>
-              <span className="count-label">Citizens Reported</span>
+            {/* Audit History Timeline Card */}
+            <div className="card audit-card">
+              <div className="audit-header">
+                <History size={16} className="text-slate-500" />
+                <h3 className="audit-title">Official Municipal Audit Trail</h3>
+              </div>
+
+              <div className="timeline-list">
+                {complaint.status_history && complaint.status_history.length > 0 ? (
+                  complaint.status_history.map((hist, idx) => {
+                    const histStat = getStatusConfig(hist.status);
+                    const HistIcon = histStat.icon;
+
+                    return (
+                      <div key={idx} className="timeline-item">
+                        <div
+                          className="timeline-icon-box"
+                          style={{ backgroundColor: histStat.bgColor, color: histStat.color }}
+                        >
+                          <HistIcon size={13} />
+                        </div>
+                        <div className="timeline-content">
+                          <div className="timeline-top-row">
+                            <span className="timeline-status-name">
+                              Status set to <strong>{histStat.label}</strong>
+                            </span>
+                            <span className="timeline-time">
+                              {formatFullDateTime(hist.created_at)}
+                            </span>
+                          </div>
+                          <p className="timeline-note">{hist.note || 'Internal status updated.'}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    No audit records registered yet.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Grid Overview */}
-          <div className="grid-2 det-grid">
-            <div>
-              <div className="info-block">
-                <span className="label">Category:</span>
-                <p className="val">
-                  {complaint.category_icon} {complaint.category_name || complaint.category_id}
-                </p>
+          {/* Right Column: Evidence, Location & Support */}
+          <div className="track-right-col">
+            {/* Incident Details Card */}
+            <div className="card incident-meta-card">
+              <div className="meta-card-head">
+                <div
+                  className="meta-cat-icon"
+                  style={{ backgroundColor: catConfig.bgColor, color: catConfig.color }}
+                >
+                  <CatIcon size={20} />
+                </div>
+                <div>
+                  <h3 className="meta-cat-title">{complaint.category_name || catConfig.name}</h3>
+                  <span className="meta-dept-name">{complaint.authority_name || catConfig.department}</span>
+                </div>
               </div>
-              <div className="info-block">
-                <span className="label">Responsible Authority:</span>
-                <p className="val">{complaint.authority_name || 'Municipal Works'}</p>
-                <span className="sub-val">{complaint.authority_department}</span>
-              </div>
-              <div className="info-block">
-                <span className="label">Location:</span>
-                <p className="val">{complaint.address_text || `${complaint.latitude}, ${complaint.longitude}`}</p>
-              </div>
-              <div className="info-block">
-                <span className="label">Description:</span>
-                <p className="val-desc">{complaint.description}</p>
-              </div>
-            </div>
 
-            <div>
-              {complaint.photo_path ? (
-                <div className="photo-box">
-                  <span className="label">Citizen Photo Evidence</span>
+              <p className="meta-desc-text">{complaint.description}</p>
+
+              {complaint.photo_path && (
+                <div className="track-photo-container">
                   <img
-                    src={`${API_BASE}${complaint.photo_path}`}
-                    alt="Complaint photo"
-                    className="complaint-img"
+                    src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path}`}
+                    alt="Geotagged Evidence"
+                    className="track-photo-img"
                     onError={(e) => {
                       e.target.style.display = 'none';
                     }}
                   />
-                  {complaint.authenticity && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <span className={`badge badge-${complaint.authenticity === 'verified' ? 'success' : 'warning'}`}>
-                        {complaint.authenticity === 'verified' ? '✅' : '⚠️'} Authenticity: {complaint.authenticity}
-                      </span>
-                    </div>
-                  )}
+                  <div className="photo-caption-bar">
+                    <Camera size={12} />
+                    <span>Geotagged Perceptual Hash Evidence</span>
+                  </div>
                 </div>
-              ) : (
-                <div className="photo-placeholder">No photo uploaded</div>
               )}
 
-              {/* Mini Map showing complaint location */}
-              {complaint.latitude && complaint.longitude && (
-                <div style={{ marginTop: '1rem' }}>
-                  <span className="label">Location on Map</span>
-                  <div style={{ marginTop: '0.35rem' }}>
+              {/* Citizen Endorsement */}
+              <div className="support-endorse-box">
+                <div>
+                  <div className="support-box-title">Citizen Consensus</div>
+                  <div className="support-box-sub">
+                    <strong>{complaint.report_count || 1}</strong> citizens have reported this hazard.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSupport}
+                  disabled={supporting || complaint.status === 'resolved'}
+                >
+                  <ThumbsUp size={14} />
+                  {supporting ? 'Verifying...' : 'I Face This Too (+1)'}
+                </button>
+              </div>
+
+              {supportMsg && (
+                <div className="support-feedback-alert">{supportMsg}</div>
+              )}
+
+              {/* Location Map Preview */}
+              <div className="track-location-section">
+                <div className="loc-label-row">
+                  <MapPin size={14} className="text-primary" />
+                  <span className="loc-address-text">{complaint.address_text || 'GPS Coordinates'}</span>
+                </div>
+
+                {complaint.latitude && complaint.longitude && (
+                  <div className="track-map-wrap">
                     <MapContainer
                       center={[complaint.latitude, complaint.longitude]}
-                      zoom={16}
-                      style={{ height: '160px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                      zoom={14}
                       scrollWheelZoom={false}
-                      dragging={false}
-                      zoomControl={false}
+                      style={{ width: '100%', height: '180px', borderRadius: 'var(--radius-md)' }}
                     >
                       <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       />
-                      <Marker position={[complaint.latitude, complaint.longitude]} />
+                      <Marker position={[complaint.latitude, complaint.longitude]}>
+                        <Popup>
+                          <strong>{complaint.id}</strong><br />
+                          {complaint.category_name}
+                        </Popup>
+                      </Marker>
                     </MapContainer>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* "I face this too" Support Button */}
-          {complaint.status !== 'resolved' && complaint.status !== 'rejected' && (
-            <div className="support-section">
-              <button
-                className="btn btn-outline support-btn"
-                onClick={handleSupport}
-                disabled={supporting}
-              >
-                {supporting ? '⏳ Adding your support...' : '🤝 I Face This Too — Add My Report'}
-              </button>
-              <p className="support-info">
-                Click to add your voice. More citizen reports = higher priority for authorities.
-              </p>
-              {supportMsg && (
-                <div className={`support-msg ${supportMsg.startsWith('Error') ? 'err' : 'ok'}`}>
-                  {supportMsg}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Timeline */}
-          <div className="timeline-section">
-            <h3 style={{ marginBottom: '1.25rem' }}>Status & Resolution Timeline</h3>
-            <div className="timeline">
-              {complaint.status_history && complaint.status_history.map((step, idx) => {
-                const { color, isLatest } = getTimelineStepStyle(step, idx, complaint.status_history.length);
-                return (
-                  <div key={step.id || idx} className={`timeline-item ${isLatest ? 'timeline-latest' : ''}`}>
-                    <div className="timeline-marker" style={{ background: color }}></div>
-                    <div className="timeline-content">
-                      <div className="timeline-top">
-                        <span className="timeline-status-badge" style={{ background: color + '18', color: color, borderColor: color + '40' }}>
-                          {STATUS_ICONS[step.status] || '📋'} {step.status.replace('_', ' ')}
-                        </span>
-                        <span className="timeline-time">
-                          {new Date(step.created_at).toLocaleString()}
-                        </span>
-                      </div>
-                      <p className="timeline-note">{step.note}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -335,226 +405,378 @@ export default function TrackComplaint() {
 
       <style>{`
         .track-header {
-          text-align: center;
           margin-bottom: 2rem;
         }
-        .track-search-box {
-          max-width: 600px;
-          margin: 0 auto 2rem;
-          padding: 1.25rem;
-        }
-        .search-form {
+        .track-search-form {
           display: flex;
           gap: 0.75rem;
+          margin-top: 1.25rem;
+          max-width: 680px;
         }
-        .track-input {
-          font-family: monospace;
-          font-size: 1.1rem !important;
-          font-weight: 700;
-          letter-spacing: 0.05em;
-        }
-        .complaint-code {
-          font-size: 1.4rem;
-          font-weight: 800;
-          font-family: monospace;
-          color: var(--primary);
-        }
-        .complaint-meta {
-          font-size: 0.8rem;
-          color: #64748b;
-        }
-        .det-header {
+        .search-bar-wrap {
+          position: relative;
           display: flex;
-          justify-content: space-between;
           align-items: center;
+          flex: 1;
+        }
+        .search-bar-icon {
+          position: absolute;
+          left: 12px;
+          color: var(--text-muted);
+        }
+        .search-bar-input {
+          width: 100%;
+          padding: 0.75rem 1rem 0.75rem 2.5rem;
+          border: 1px solid var(--border-strong);
+          border-radius: var(--radius-md);
+          font-family: var(--font-mono);
+          font-size: 0.95rem;
+          background: #ffffff;
+        }
+        .sample-tags-row {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-top: 0.85rem;
+          font-size: 0.775rem;
+          flex-wrap: wrap;
+        }
+        .sample-label {
+          color: var(--text-muted);
+        }
+        .sample-tag-btn {
+          background-color: var(--bg-subtle);
+          border: 1px solid var(--border);
+          padding: 2px 8px;
+          border-radius: 4px;
+          font-family: var(--font-mono);
+          font-size: 0.75rem;
+          color: var(--primary);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .sample-tag-btn:hover {
+          background-color: var(--primary-light);
+          border-color: var(--primary);
+        }
+        .track-error-card {
+          padding: 2.5rem;
+          text-align: center;
+          max-width: 580px;
+          margin: 2rem auto;
+        }
+        .error-title {
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: var(--text-main);
+          margin-bottom: 0.5rem;
+        }
+        .error-desc {
+          font-size: 0.875rem;
+          color: var(--text-muted);
+          margin-bottom: 1.25rem;
+        }
+        .error-actions {
+          display: flex;
+          justify-content: center;
+          gap: 0.75rem;
+        }
+        .track-result-grid {
+          display: grid;
+          grid-template-columns: 1fr 380px;
+          gap: 1.75rem;
+          align-items: flex-start;
+        }
+        .track-left-col {
+          display: flex;
+          flex-direction: column;
+          gap: 1.5rem;
+        }
+        .track-stepper-card {
+          padding: 1.5rem;
+        }
+        .stepper-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
           padding-bottom: 1.25rem;
           border-bottom: 1px solid var(--border);
           margin-bottom: 1.5rem;
         }
-        .report-count-pill {
-          background: #eff6ff;
-          border: 1px solid var(--primary-border);
-          padding: 0.5rem 1rem;
-          border-radius: var(--radius-md);
-          text-align: center;
-          flex-shrink: 0;
+        .stepper-id-label {
+          font-size: 0.72rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          color: var(--text-muted);
+          letter-spacing: 0.04em;
         }
-        .count-number {
-          display: block;
+        .stepper-id-val {
+          font-family: var(--font-mono);
           font-size: 1.35rem;
           font-weight: 800;
-          color: var(--primary);
-        }
-        .count-label {
-          font-size: 0.7rem;
-          font-weight: 600;
-          color: #475569;
-          text-transform: uppercase;
-        }
-        .det-grid {
-          margin-bottom: 2rem;
-        }
-        .info-block {
-          margin-bottom: 1rem;
-        }
-        .label {
-          display: block;
-          font-size: 0.75rem;
-          text-transform: uppercase;
-          font-weight: 700;
-          color: #64748b;
-          margin-bottom: 0.2rem;
-        }
-        .val {
-          font-weight: 600;
           color: var(--text-main);
-          font-size: 1.05rem;
         }
-        .sub-val {
-          font-size: 0.8rem;
-          color: #64748b;
+        .stepper-progress-bar {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          position: relative;
         }
-        .val-desc {
-          background: #f8fafc;
-          padding: 0.75rem;
-          border-radius: var(--radius-sm);
-          font-size: 0.9rem;
-          color: #334155;
-          line-height: 1.5;
+        .step-milestone {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+          position: relative;
         }
-        .complaint-img {
+        .step-milestone:not(:last-child)::after {
+          content: '';
+          position: absolute;
+          top: 15px;
+          left: 50%;
           width: 100%;
-          max-height: 220px;
-          object-fit: cover;
-          border-radius: var(--radius-md);
-          border: 1px solid var(--border);
-          margin-top: 0.35rem;
+          height: 2px;
+          background-color: var(--border);
+          z-index: 1;
         }
-        .photo-placeholder {
-          height: 160px;
-          background: #f1f5f9;
+        .step-completed:not(:last-child)::after {
+          background-color: var(--resolved-indicator);
+        }
+        .step-circle {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background-color: var(--bg-subtle);
+          border: 2px solid var(--border-strong);
           display: flex;
           align-items: center;
           justify-content: center;
-          border-radius: var(--radius-md);
-          color: #94a3b8;
-        }
-        .support-section {
-          padding: 1.25rem 0;
-          border-top: 1px solid var(--border);
-          border-bottom: 1px solid var(--border);
-          margin-bottom: 1.5rem;
-          text-align: center;
-        }
-        .support-btn {
-          font-size: 1rem;
-          padding: 0.75rem 1.5rem;
-        }
-        .support-info {
-          font-size: 0.8rem;
+          font-size: 0.8125rem;
+          font-weight: 700;
           color: var(--text-muted);
-          margin-top: 0.5rem;
-        }
-        .support-msg {
-          margin-top: 0.75rem;
-          padding: 0.5rem 0.9rem;
-          border-radius: var(--radius-md);
-          font-size: 0.85rem;
-          display: inline-block;
-        }
-        .support-msg.ok {
-          background: #dcfce7;
-          color: #166534;
-          border: 1px solid #86efac;
-        }
-        .support-msg.err {
-          background: #fee2e2;
-          color: #991b1b;
-          border: 1px solid #fca5a5;
-        }
-        .timeline-section {
-          padding-top: 1.5rem;
-        }
-        .timeline {
           position: relative;
-          padding-left: 1.5rem;
+          z-index: 2;
+          margin-bottom: 0.5rem;
+          transition: all 0.2s;
         }
-        .timeline::before {
-          content: '';
-          position: absolute;
-          left: 6px;
-          top: 8px;
-          bottom: 8px;
-          width: 2px;
-          background: #e2e8f0;
+        .step-completed .step-circle {
+          background-color: #dcfce7;
+          border-color: #16a34a;
+          color: #16a34a;
         }
-        .timeline-item {
-          position: relative;
-          margin-bottom: 1.5rem;
+        .step-current .step-circle {
+          background-color: #f0f9ff;
+          border-color: #0284c7;
+          color: #0284c7;
+          box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
         }
-        .timeline-item.timeline-latest {
-          margin-bottom: 0;
+        .step-label-main {
+          font-size: 0.8125rem;
+          font-weight: 700;
+          color: var(--text-main);
+          margin-bottom: 0.15rem;
         }
-        .timeline-marker {
-          position: absolute;
-          left: -1.5rem;
-          top: 4px;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          background: var(--primary);
-          border: 3px solid #ffffff;
-          box-shadow: 0 0 0 1px #cbd5e1;
+        .step-label-sub {
+          font-size: 0.7rem;
+          color: var(--text-muted);
         }
-        .timeline-item.timeline-latest .timeline-marker {
-          width: 16px;
-          height: 16px;
-          box-shadow: 0 0 0 2px currentColor, 0 0 8px rgba(30,64,175,0.25);
+
+        /* Audit Timeline */
+        .audit-card {
+          padding: 1.5rem;
         }
-        .timeline-top {
+        .audit-header {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          margin-bottom: 0.35rem;
+          gap: 0.45rem;
+          margin-bottom: 1.25rem;
+          padding-bottom: 0.75rem;
+          border-bottom: 1px solid var(--border);
         }
-        .timeline-status-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.3rem;
-          padding: 0.2rem 0.6rem;
-          border-radius: var(--radius-full);
-          font-size: 0.75rem;
+        .audit-title {
+          font-size: 0.95rem;
           font-weight: 700;
-          text-transform: uppercase;
-          border: 1px solid;
+          color: var(--text-main);
+        }
+        .timeline-list {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
+          position: relative;
+          padding-left: 0.5rem;
+        }
+        .timeline-item {
+          display: flex;
+          align-items: flex-start;
+          gap: 0.85rem;
+          position: relative;
+        }
+        .timeline-icon-box {
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          margin-top: 2px;
+        }
+        .timeline-content {
+          flex: 1;
+        }
+        .timeline-top-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.25rem;
+          font-size: 0.8125rem;
+        }
+        .timeline-status-name {
+          color: var(--text-main);
         }
         .timeline-time {
-          font-size: 0.75rem;
-          color: #64748b;
+          font-size: 0.72rem;
+          color: var(--text-muted);
         }
         .timeline-note {
-          font-size: 0.9rem;
-          color: #334155;
+          font-size: 0.8125rem;
+          color: var(--text-secondary);
+          line-height: 1.45;
+          background-color: var(--bg-subtle);
+          padding: 0.45rem 0.65rem;
+          border-radius: 4px;
+          margin-top: 0.35rem;
         }
-        .spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid #e2e8f0;
-          border-top-color: var(--primary);
-          border-radius: 50%;
-          animation: spin 0.6s linear infinite;
-          margin: 0 auto 1rem;
+
+        /* Right Column */
+        .track-right-col {
+          display: flex;
+          flex-direction: column;
+          gap: 1.25rem;
         }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
+        .incident-meta-card {
+          padding: 1.25rem;
+        }
+        .meta-card-head {
+          display: flex;
+          align-items: center;
+          gap: 0.65rem;
+          margin-bottom: 0.85rem;
+        }
+        .meta-cat-icon {
+          width: 38px;
+          height: 38px;
+          border-radius: var(--radius-md);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .meta-cat-title {
+          font-size: 0.95rem;
+          font-weight: 700;
+          color: var(--text-main);
+        }
+        .meta-dept-name {
+          font-size: 0.72rem;
+          color: var(--text-muted);
+        }
+        .meta-desc-text {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          line-height: 1.45;
+          margin-bottom: 1rem;
+        }
+        .track-photo-container {
+          position: relative;
+          border-radius: var(--radius-md);
+          overflow: hidden;
+          margin-bottom: 1rem;
+          border: 1px solid var(--border);
+        }
+        .track-photo-img {
+          width: 100%;
+          max-height: 200px;
+          object-fit: cover;
+          display: block;
+        }
+        .photo-caption-bar {
+          position: absolute;
+          bottom: 6px;
+          left: 6px;
+          background: rgba(15, 23, 42, 0.8);
+          color: #ffffff;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 0.68rem;
+          display: flex;
+          align-items: center;
+          gap: 0.3rem;
+        }
+        .support-endorse-box {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          background: #f0fdf4;
+          border: 1px solid #bbf7d0;
+          border-radius: var(--radius-md);
+          padding: 0.75rem;
+          margin-bottom: 1rem;
+        }
+        .support-box-title {
+          font-size: 0.775rem;
+          font-weight: 700;
+          color: #166534;
+        }
+        .support-box-sub {
+          font-size: 0.72rem;
+          color: #15803d;
+        }
+        .support-feedback-alert {
+          background-color: #f0fdf4;
+          color: #166534;
+          padding: 0.45rem 0.65rem;
+          border-radius: 4px;
+          font-size: 0.775rem;
+          margin-bottom: 1rem;
+        }
+        .track-location-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.4rem;
+        }
+        .loc-label-row {
+          display: flex;
+          align-items: center;
+          gap: 0.35rem;
+          font-size: 0.775rem;
+          color: var(--text-main);
+          font-weight: 600;
+        }
+        .loc-address-text {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .track-map-wrap {
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          overflow: hidden;
+        }
+
+        @media (max-width: 960px) {
+          .track-result-grid {
+            grid-template-columns: 1fr;
+          }
         }
         @media (max-width: 640px) {
-          .det-header {
-            flex-direction: column;
-            align-items: flex-start;
+          .stepper-progress-bar {
+            grid-template-columns: repeat(2, 1fr);
             gap: 1rem;
           }
-          .search-form {
+          .step-milestone::after {
+            display: none !important;
+          }
+          .track-search-form {
             flex-direction: column;
           }
         }

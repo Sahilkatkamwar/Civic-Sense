@@ -1,17 +1,19 @@
 // client/src/App.jsx
-// Owner: Sahil (Team Lead) - Master Route Configuration & Layout
+// Civic-Sense — AI-Powered Civic Intelligence Platform
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
-// Pages & Modules
+// Pages & Feature Modules
 import Home from './pages/Home';
+import AuthorityDashboard from './modules/report/AuthorityDashboard';
+import IncidentsTable from './modules/issues/IncidentsTable';
+import AnalyticsDashboard from './modules/analytics/AnalyticsDashboard';
 import IssueList from './modules/issues/IssueList';
 import IssueDetail from './modules/issues/IssueDetail';
 import ReportForm from './modules/report/ReportForm';
 import TrackComplaint from './modules/report/TrackComplaint';
-import AuthorityDashboard from './modules/report/AuthorityDashboard';
 import NotFound from './pages/NotFound';
 
 import './theme.css';
@@ -21,26 +23,32 @@ export default function App() {
     <Router>
       <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Navbar />
-        
-        <main style={{ flex: 1 }}>
+
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <Routes>
-            {/* Sahil - Home */}
+            {/* Municipal Executive Overview */}
             <Route path="/" element={<Home />} />
 
-            {/* Sujal - Issue Explorer */}
+            {/* Municipal Operations & Authority Command */}
+            <Route path="/authority" element={<AuthorityDashboard />} />
+
+            {/* Incidents Registry & Table */}
+            <Route path="/incidents" element={<IncidentsTable />} />
+
+            {/* Municipal Risk Analytics */}
+            <Route path="/analytics" element={<AnalyticsDashboard />} />
+
+            {/* Issue Directory & Safety Protocols */}
             <Route path="/issues" element={<IssueList />} />
             <Route path="/issues/:categoryId" element={<IssueDetail />} />
 
-            {/* Tanush - Complaint Submission */}
+            {/* Field Hazard Reporting */}
             <Route path="/report" element={<ReportForm />} />
             <Route path="/report/:categoryId" element={<ReportForm />} />
 
-            {/* Tanush - Tracking */}
+            {/* Real-time Incident Tracking */}
             <Route path="/track" element={<TrackComplaint />} />
             <Route path="/track/:complaintId" element={<TrackComplaint />} />
-
-            {/* Tanush - Authority Command Center */}
-            <Route path="/authority" element={<AuthorityDashboard />} />
 
             {/* 404 Fallback */}
             <Route path="*" element={<NotFound />} />

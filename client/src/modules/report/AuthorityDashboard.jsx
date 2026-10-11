@@ -172,13 +172,13 @@ export default function AuthorityDashboard() {
   return (
     <div className="container page-wrapper">
       <div className="auth-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center' }}>
-          <span className="badge badge-critical">Official Portal</span>
-          <span className="badge badge-low">Simulation Mode</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'center', marginBottom: '0.5rem' }}>
+          <span className="gov-seal-box">सक्षम प्राधिकारी नियंत्रण कक्ष / MUNICIPAL DISPATCH DESK</span>
+          <span className="badge badge-gov">PUBLIC SERVICE GUARANTEE ACT ALIGNED</span>
         </div>
-        <h1 className="page-title">Municipal Authority Command Center</h1>
+        <h1 className="page-title">Municipal Authority Command & Dispatch Center</h1>
         <p className="page-subtitle">
-          Real-time incident dispatch, triage queue sorted by dynamic algorithmic priority, and citizen resolution workflow.
+          Centralized administrative command for municipal ward officers and field engineers. Review photographic evidence, assign field repair dispatches, and record statutory resolution audits.
         </p>
       </div>
 
