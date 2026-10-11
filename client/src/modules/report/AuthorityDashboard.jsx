@@ -1,30 +1,86 @@
 // client/src/modules/report/AuthorityDashboard.jsx
 // Owner: Tanush (Authority Dashboard)
 import React, { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Fix for default Leaflet marker icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+const STATUS_ICONS = {
+  submitted: '📝',
+  under_review: '🔍',
+  in_progress: '🔧',
+  resolved: '✅',
+  rejected: '❌'
+};
+
+/**
+ * Status transition buttons based on current status.
+ * Per spec: submitted → under_review → in_progress → resolved (or rejected at any non-terminal step)
+ */
+const STATUS_ACTIONS = {
+  submitted: [
+    { status: 'under_review', label: 'Accept & Review', style: 'primary' },
+    { status: 'rejected', label: 'Reject', style: 'danger' }
+  ],
+  under_review: [
+    { status: 'in_progress', label: 'Dispatch / In Progress', style: 'primary' },
+    { status: 'rejected', label: 'Reject', style: 'danger' }
+  ],
+  in_progress: [
+    { status: 'resolved', label: 'Mark Resolved', style: 'success' },
+    { status: 'under_review', label: '↩ Return to Review', style: 'secondary' },
+    { status: 'rejected', label: 'Reject', style: 'danger' }
+  ],
+  resolved: [
+    { status: 'under_review', label: '↩ Reopen for Review', style: 'secondary' }
+  ],
+  rejected: [
+    { status: 'under_review', label: '↩ Reopen for Review', style: 'secondary' }
+  ]
+};
+
 export default function AuthorityDashboard() {
   const [complaints, setComplaints] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [detailData, setDetailData] = useState(null);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [filterPriority, setFilterPriority] = useState('all');
   const [statusNote, setStatusNote] = useState('');
   const [updating, setUpdating] = useState(false);
   const [message, setMessage] = useState('');
 
-  const fetchQueue = () => {
-    setLoading(true);
+  // Fetch categories for filter dropdown
+  useEffect(() => {
+    fetch(`${API_BASE}/api/categories`)
+      .then((res) => res.json())
+      .then((data) => setCategories(data))
+      .catch((err) => console.error('Error fetching categories:', err));
+  }, []);
+
+  const fetchQueue = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     fetch(`${API_BASE}/api/authority/complaints`)
       .then((res) => res.json())
       .then((data) => {
         setComplaints(data);
         if (data.length > 0 && !selectedComplaint) {
-          setSelectedComplaint(data[0]);
+          selectComplaint(data[0]);
         } else if (selectedComplaint) {
           const updated = data.find((c) => c.id === selectedComplaint.id);
-          if (updated) setSelectedComplaint(updated);
+          if (updated) selectComplaint(updated);
         }
         setLoading(false);
       })
@@ -34,8 +90,35 @@ export default function AuthorityDashboard() {
       });
   };
 
+  // Fetch full detail (with status_history) for selected complaint
+  const selectComplaint = (c) => {
+    setSelectedComplaint(c);
+    setMessage('');
+
+    fetch(`${API_BASE}/api/complaints/${c.id}`)
+      .then((res) => res.json())
+      .then((data) => setDetailData(data))
+      .catch(() => setDetailData(null));
+  };
+
   useEffect(() => {
-    fetchQueue();
+    fetch(`${API_BASE}/api/authority/complaints`)
+      .then((res) => res.json())
+      .then((data) => {
+        setComplaints(data);
+        if (data.length > 0) {
+          setSelectedComplaint(data[0]);
+          fetch(`${API_BASE}/api/complaints/${data[0].id}`)
+            .then((r) => r.json())
+            .then((d) => setDetailData(d))
+            .catch(() => setDetailData(null));
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching authority queue:', err);
+        setLoading(false);
+      });
   }, []);
 
   const handleStatusUpdate = async (newStatus) => {
@@ -58,21 +141,33 @@ export default function AuthorityDashboard() {
         throw new Error(data.error || 'Failed to update status');
       }
 
-      setMessage(`Status updated to ${newStatus} successfully!`);
+      setMessage(`✅ Status updated to "${newStatus.replace('_', ' ')}" successfully!`);
       setStatusNote('');
       fetchQueue();
     } catch (err) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(`❌ Error: ${err.message}`);
     } finally {
       setUpdating(false);
     }
   };
 
+  // Client-side filtering
   const filteredList = complaints.filter((c) => {
     if (filterStatus !== 'all' && c.status !== filterStatus) return false;
+    if (filterCategory !== 'all' && c.category_id !== filterCategory) return false;
     if (filterPriority !== 'all' && c.priority_level !== filterPriority) return false;
     return true;
   });
+
+  // Count stats for quick summary
+  const stats = {
+    total: complaints.length,
+    critical: complaints.filter(c => c.priority_level === 'critical').length,
+    suspicious: complaints.filter(c => c.authenticity === 'suspicious').length,
+    pending: complaints.filter(c => c.status === 'submitted').length,
+  };
+
+  const currentActions = selectedComplaint ? (STATUS_ACTIONS[selectedComplaint.status] || []) : [];
 
   return (
     <div className="container page-wrapper">
@@ -87,41 +182,77 @@ export default function AuthorityDashboard() {
         </p>
       </div>
 
+      {/* Quick Stats Bar */}
+      <div className="stats-bar">
+        <div className="stat-chip">
+          <span className="stat-value">{stats.total}</span>
+          <span className="stat-label">Total</span>
+        </div>
+        <div className="stat-chip stat-critical">
+          <span className="stat-value">{stats.critical}</span>
+          <span className="stat-label">Critical</span>
+        </div>
+        <div className="stat-chip stat-pending">
+          <span className="stat-value">{stats.pending}</span>
+          <span className="stat-label">Pending</span>
+        </div>
+        {stats.suspicious > 0 && (
+          <div className="stat-chip stat-suspicious">
+            <span className="stat-value">{stats.suspicious}</span>
+            <span className="stat-label">Suspicious</span>
+          </div>
+        )}
+      </div>
+
       {/* Filter Toolbar */}
       <div className="card toolbar">
         <div className="toolbar-group">
-          <label>Status Filter:</label>
+          <label>Status:</label>
           <select
             className="form-select form-select-sm"
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
           >
             <option value="all">All Statuses</option>
-            <option value="submitted">Submitted</option>
-            <option value="under_review">Under Review</option>
-            <option value="in_progress">In Progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="rejected">Rejected</option>
+            <option value="submitted">📝 Submitted</option>
+            <option value="under_review">🔍 Under Review</option>
+            <option value="in_progress">🔧 In Progress</option>
+            <option value="resolved">✅ Resolved</option>
+            <option value="rejected">❌ Rejected</option>
           </select>
         </div>
 
         <div className="toolbar-group">
-          <label>Priority Filter:</label>
+          <label>Category:</label>
+          <select
+            className="form-select form-select-sm"
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+          >
+            <option value="all">All Categories</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="toolbar-group">
+          <label>Priority:</label>
           <select
             className="form-select form-select-sm"
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
           >
             <option value="all">All Priorities</option>
-            <option value="critical">Critical (70+)</option>
-            <option value="high">High (40-69)</option>
-            <option value="medium">Medium (20-39)</option>
-            <option value="low">Low (&lt;20)</option>
+            <option value="critical">🔴 Critical (70+)</option>
+            <option value="high">🟠 High (40-69)</option>
+            <option value="medium">🟡 Medium (20-39)</option>
+            <option value="low">⚪ Low (&lt;20)</option>
           </select>
         </div>
 
         <button onClick={fetchQueue} className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }}>
-          🔄 Refresh Queue
+          🔄 Refresh
         </button>
       </div>
 
@@ -149,10 +280,7 @@ export default function AuthorityDashboard() {
                     <div
                       key={c.id}
                       className={`queue-item ${isSelected ? 'selected' : ''}`}
-                      onClick={() => {
-                        setSelectedComplaint(c);
-                        setMessage('');
-                      }}
+                      onClick={() => selectComplaint(c)}
                     >
                       <div className="queue-item-header">
                         <span className="queue-id">{c.id}</span>
@@ -168,9 +296,11 @@ export default function AuthorityDashboard() {
 
                       <div className="queue-item-footer">
                         <span className="queue-reports">👥 {c.report_count} reports</span>
-                        <span className={`badge badge-low status-pill`}>{c.status}</span>
+                        <span className={`badge badge-${c.status === 'resolved' ? 'success' : c.status === 'rejected' ? 'critical' : 'low'}`}>
+                          {STATUS_ICONS[c.status]} {c.status.replace('_', ' ')}
+                        </span>
                         {c.authenticity === 'suspicious' && (
-                          <span className="badge badge-warning">Suspicious Photo</span>
+                          <span className="badge badge-warning">⚠️ Suspicious</span>
                         )}
                       </div>
                     </div>
@@ -191,16 +321,18 @@ export default function AuthorityDashboard() {
                       Registered: {new Date(selectedComplaint.created_at).toLocaleString()}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <span className={`badge badge-${selectedComplaint.priority_level}`}>
                       {selectedComplaint.priority_level} (Score: {selectedComplaint.priority_score})
                     </span>
-                    <span className="badge badge-low">{selectedComplaint.status}</span>
+                    <span className={`badge badge-${selectedComplaint.status === 'resolved' ? 'success' : selectedComplaint.status === 'rejected' ? 'critical' : 'low'}`}>
+                      {STATUS_ICONS[selectedComplaint.status]} {selectedComplaint.status.replace('_', ' ')}
+                    </span>
                   </div>
                 </div>
 
                 {message && (
-                  <div className={`alert-msg ${message.startsWith('Error') ? 'alert-err' : 'alert-ok'}`}>
+                  <div className={`alert-msg ${message.startsWith('❌') ? 'alert-err' : 'alert-ok'}`}>
                     {message}
                   </div>
                 )}
@@ -225,7 +357,7 @@ export default function AuthorityDashboard() {
                   <div className="field-row">
                     <strong>Photo Authenticity:</strong>
                     <span className={`badge badge-${selectedComplaint.authenticity === 'verified' ? 'success' : 'warning'}`}>
-                      {selectedComplaint.authenticity}
+                      {selectedComplaint.authenticity === 'verified' ? '✅' : '⚠️'} {selectedComplaint.authenticity}
                     </span>
                   </div>
                   <div className="field-row">
@@ -242,9 +374,46 @@ export default function AuthorityDashboard() {
                       <img
                         src={`${API_BASE}${selectedComplaint.photo_path}`}
                         alt="Evidence"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)' }}
+                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                       />
+                    </div>
+                  </div>
+                )}
+
+                {/* Map */}
+                {selectedComplaint.latitude && selectedComplaint.longitude && (
+                  <div style={{ margin: '1rem 0' }}>
+                    <strong>Location on Map:</strong>
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <MapContainer
+                        key={selectedComplaint.id}
+                        center={[selectedComplaint.latitude, selectedComplaint.longitude]}
+                        zoom={16}
+                        style={{ height: '180px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                        scrollWheelZoom={false}
+                      >
+                        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                        <Marker position={[selectedComplaint.latitude, selectedComplaint.longitude]} />
+                      </MapContainer>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status History */}
+                {detailData && detailData.status_history && detailData.status_history.length > 0 && (
+                  <div style={{ margin: '1rem 0', padding: '1rem 0', borderTop: '1px solid var(--border)' }}>
+                    <strong>Status History:</strong>
+                    <div className="mini-timeline">
+                      {detailData.status_history.map((step, idx) => (
+                        <div key={step.id || idx} className="mini-timeline-item">
+                          <span className="mini-step-status">
+                            {STATUS_ICONS[step.status]} {step.status.replace('_', ' ')}
+                          </span>
+                          <span className="mini-step-time">{new Date(step.created_at).toLocaleString()}</span>
+                          <span className="mini-step-note">{step.note}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -267,37 +436,36 @@ export default function AuthorityDashboard() {
                   </div>
 
                   <div className="status-buttons">
-                    <button
-                      className="btn btn-secondary btn-sm"
-                      onClick={() => handleStatusUpdate('under_review')}
-                      disabled={updating || selectedComplaint.status === 'under_review'}
-                      title={selectedComplaint.status === 'under_review' ? 'Already in this status' : ''}
-                    >
-                      {selectedComplaint.status === 'in_progress' ? '↩ Return to Review' : 'Mark Under Review'}
-                    </button>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => handleStatusUpdate('in_progress')}
-                      disabled={updating || selectedComplaint.status === 'in_progress' || selectedComplaint.status === 'resolved'}
-                    >
-                      Dispatch / In Progress
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      style={{ color: '#166534', borderColor: '#86efac', background: '#dcfce7' }}
-                      onClick={() => handleStatusUpdate('resolved')}
-                      disabled={updating || selectedComplaint.status === 'resolved'}
-                    >
-                      Mark Resolved
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleStatusUpdate('rejected')}
-                      disabled={updating || selectedComplaint.status === 'rejected'}
-                    >
-                      Reject Complaint
-                    </button>
+                    {currentActions.map((action) => {
+                      let btnClass = 'btn btn-sm ';
+                      if (action.style === 'primary') btnClass += 'btn-primary';
+                      else if (action.style === 'danger') btnClass += 'btn-danger';
+                      else if (action.style === 'success') btnClass += 'btn-outline';
+                      else btnClass += 'btn-secondary';
+
+                      const successStyle = action.style === 'success'
+                        ? { color: '#166534', borderColor: '#86efac', background: '#dcfce7' }
+                        : {};
+
+                      return (
+                        <button
+                          key={action.status}
+                          className={btnClass}
+                          style={successStyle}
+                          onClick={() => handleStatusUpdate(action.status)}
+                          disabled={updating}
+                        >
+                          {action.label}
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {currentActions.length === 0 && (
+                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                      No further status transitions available for this state.
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (
@@ -312,12 +480,47 @@ export default function AuthorityDashboard() {
           text-align: center;
           margin-bottom: 2rem;
         }
+        .stats-bar {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+        }
+        .stat-chip {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          padding: 0.6rem 1.25rem;
+          background: var(--bg-card);
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          min-width: 80px;
+        }
+        .stat-chip .stat-value {
+          font-size: 1.35rem;
+          font-weight: 800;
+          color: var(--text-main);
+        }
+        .stat-chip .stat-label {
+          font-size: 0.7rem;
+          text-transform: uppercase;
+          font-weight: 600;
+          color: var(--text-muted);
+        }
+        .stat-critical .stat-value { color: #dc2626; }
+        .stat-critical { border-color: #fca5a5; background: #fef2f2; }
+        .stat-pending .stat-value { color: #2563eb; }
+        .stat-pending { border-color: var(--primary-border); background: #eff6ff; }
+        .stat-suspicious .stat-value { color: #d97706; }
+        .stat-suspicious { border-color: #fde047; background: #fef9c3; }
         .toolbar {
           display: flex;
           align-items: center;
           gap: 1.5rem;
           margin-bottom: 1.5rem;
           padding: 1rem 1.5rem;
+          flex-wrap: wrap;
         }
         .toolbar-group {
           display: flex;
@@ -383,6 +586,7 @@ export default function AuthorityDashboard() {
           gap: 0.5rem;
           font-size: 0.75rem;
           color: #64748b;
+          flex-wrap: wrap;
         }
         .detail-pane-header {
           display: flex;
@@ -426,6 +630,48 @@ export default function AuthorityDashboard() {
           background: #fee2e2;
           color: #991b1b;
           border: 1px solid #fca5a5;
+        }
+        .mini-timeline {
+          margin-top: 0.5rem;
+        }
+        .mini-timeline-item {
+          padding: 0.5rem 0;
+          border-bottom: 1px solid #f1f5f9;
+          font-size: 0.825rem;
+          display: flex;
+          gap: 0.75rem;
+          align-items: baseline;
+          flex-wrap: wrap;
+        }
+        .mini-timeline-item:last-child {
+          border-bottom: none;
+        }
+        .mini-step-status {
+          font-weight: 700;
+          text-transform: uppercase;
+          font-size: 0.75rem;
+          min-width: 110px;
+        }
+        .mini-step-time {
+          font-size: 0.7rem;
+          color: #94a3b8;
+          min-width: 140px;
+        }
+        .mini-step-note {
+          color: #475569;
+          flex: 1;
+        }
+        .spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid #e2e8f0;
+          border-top-color: var(--primary);
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+          margin: 0 auto 1rem;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
         @media (max-width: 900px) {
           .auth-layout {

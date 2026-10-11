@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import CategoryCard from '../modules/issues/CategoryCard';
 import MiniMap from '../components/MiniMap';
-import { howItWorksSteps, aboutText, faqs } from '../content/text';
+import { howItWorksSteps, faqs } from '../content/text';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -19,7 +19,6 @@ export default function Home() {
   const [categories, setCategories] = useState([]);
   const [topComplaints, setTopComplaints] = useState([]);
   const [allComplaints, setAllComplaints] = useState([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Fetch live stats
@@ -40,11 +39,9 @@ export default function Home() {
       .then((data) => {
         setAllComplaints(data);
         setTopComplaints(data.slice(0, 3));
-        setLoading(false);
       })
       .catch((err) => {
         console.error('Failed to load priority complaints:', err);
-        setLoading(false);
       });
   }, []);
 

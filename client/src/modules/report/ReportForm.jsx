@@ -1,13 +1,63 @@
 // client/src/modules/report/ReportForm.jsx
 // Owner: Tanush (Complaint Submission & Tracking Module)
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Fix for default Leaflet marker icons in bundlers
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
+/**
+ * Inner component to handle draggable map marker and click-to-move
+ */
+function LocationMarker({ position, onPositionChange }) {
+  useMapEvents({
+    click(e) {
+      onPositionChange(e.latlng);
+    },
+  });
+
+  if (!position) return null;
+
+  return (
+    <Marker
+      position={position}
+      draggable={true}
+      eventHandlers={{
+        dragend: (e) => {
+          const marker = e.target;
+          const pos = marker.getLatLng();
+          onPositionChange(pos);
+        },
+      }}
+    />
+  );
+}
+
+/**
+ * Component to recenter the map when position changes
+ */
+function RecenterMap({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.setView(position, map.getZoom());
+    }
+  }, [position, map]);
+  return null;
+}
+
 export default function ReportForm() {
   const { categoryId: urlCategoryId } = useParams();
-  const navigate = useNavigate();
 
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(urlCategoryId || '');
@@ -15,6 +65,7 @@ export default function ReportForm() {
   const [addressText, setAddressText] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
+  const [mapPosition, setMapPosition] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
@@ -22,17 +73,20 @@ export default function ReportForm() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [submissionResult, setSubmissionResult] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/categories`)
       .then((res) => res.json())
       .then((data) => {
         setCategories(data);
-        if (urlCategoryId && !selectedCategory) {
-          setSelectedCategory(urlCategoryId);
-        } else if (!selectedCategory && data.length > 0) {
-          setSelectedCategory(data[0].id);
-        }
+        setSelectedCategory((prev) => {
+          if (urlCategoryId) return urlCategoryId;
+          if (!prev && data.length > 0) return data[0].id;
+          return prev;
+        });
       })
       .catch((err) => console.error('Failed to load categories:', err));
   }, [urlCategoryId]);
@@ -48,19 +102,53 @@ export default function ReportForm() {
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setLatitude(pos.coords.latitude.toFixed(6));
-        setLongitude(pos.coords.longitude.toFixed(6));
+        const lat = pos.coords.latitude.toFixed(6);
+        const lon = pos.coords.longitude.toFixed(6);
+        setLatitude(lat);
+        setLongitude(lon);
+        setMapPosition([parseFloat(lat), parseFloat(lon)]);
         setLocating(false);
       },
       (err) => {
         console.warn('Geolocation error, using default city center:', err.message);
-        // Fallback default coordinates (e.g. Mumbai civic center)
+        // Fallback default coordinates (Mumbai civic center)
         setLatitude('19.076000');
         setLongitude('72.877700');
+        setMapPosition([19.076000, 72.877700]);
         setLocating(false);
       },
       { timeout: 10000, enableHighAccuracy: true }
     );
+  };
+
+  // Map marker position change handler
+  const handleMapPositionChange = (latlng) => {
+    const lat = latlng.lat.toFixed(6);
+    const lng = latlng.lng.toFixed(6);
+    setLatitude(lat);
+    setLongitude(lng);
+    setMapPosition([latlng.lat, latlng.lng]);
+  };
+
+  // Manual coordinate input change
+  const handleLatChange = (e) => {
+    const val = e.target.value;
+    setLatitude(val);
+    const lat = parseFloat(val);
+    const lon = parseFloat(longitude);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      setMapPosition([lat, lon]);
+    }
+  };
+
+  const handleLonChange = (e) => {
+    const val = e.target.value;
+    setLongitude(val);
+    const lat = parseFloat(latitude);
+    const lon = parseFloat(val);
+    if (!isNaN(lat) && !isNaN(lon)) {
+      setMapPosition([lat, lon]);
+    }
   };
 
   // Photo change handler
@@ -72,21 +160,32 @@ export default function ReportForm() {
     }
   };
 
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   // Submission handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
 
+    // Validation
     if (!selectedCategory) {
       setErrorMessage('Please select an issue category.');
       return;
     }
-    if (!description || description.trim().length < 10) {
-      setErrorMessage('Please provide a description of at least 10 characters.');
+    if (!photoFile) {
+      setErrorMessage('Please upload a photo of the issue. This helps authorities verify and prioritize the complaint.');
       return;
     }
     if (!latitude || !longitude) {
-      setErrorMessage('Please capture your location coordinates.');
+      setErrorMessage('Please capture your location using the GPS button or by clicking on the map.');
+      return;
+    }
+    if (!description || description.trim().length < 10) {
+      setErrorMessage('Please provide a description of at least 10 characters.');
       return;
     }
 
@@ -118,6 +217,15 @@ export default function ReportForm() {
     }
   };
 
+  // Copy complaint ID handler
+  const handleCopyId = () => {
+    if (submissionResult) {
+      navigator.clipboard.writeText(submissionResult.id);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   // If submitted successfully, show Confirmation Screen
   if (submissionResult) {
     return (
@@ -139,15 +247,19 @@ export default function ReportForm() {
               <span className="conf-id-code">{submissionResult.id}</span>
               <button
                 className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  navigator.clipboard.writeText(submissionResult.id);
-                  alert('Copied Complaint ID: ' + submissionResult.id);
-                }}
+                onClick={handleCopyId}
               >
-                📋 Copy ID
+                {copied ? '✅ Copied!' : '📋 Copy ID'}
               </button>
             </div>
           </div>
+
+          {submissionResult.duplicate && (
+            <div className="duplicate-notice">
+              <span className="dup-icon">ℹ️</span>
+              <p>This issue was already reported by another citizen. Your report has been merged to increase its priority and visibility.</p>
+            </div>
+          )}
 
           <div className="conf-details-grid">
             <div className="conf-detail-item">
@@ -176,6 +288,7 @@ export default function ReportForm() {
                 setDescription('');
                 setPhotoFile(null);
                 setPhotoPreview(null);
+                setCopied(false);
               }}
               className="btn btn-secondary"
             >
@@ -235,6 +348,28 @@ export default function ReportForm() {
             color: var(--primary);
             letter-spacing: 0.05em;
           }
+          .duplicate-notice {
+            background: #eff6ff;
+            border: 1px solid var(--primary-border);
+            border-radius: var(--radius-md);
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            text-align: left;
+          }
+          .duplicate-notice .dup-icon {
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            margin-top: 0.1rem;
+          }
+          .duplicate-notice p {
+            font-size: 0.9rem;
+            color: #1e40af;
+            line-height: 1.5;
+            margin: 0;
+          }
           .conf-details-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -288,7 +423,7 @@ export default function ReportForm() {
 
         {errorMessage && (
           <div className="card alert-error" style={{ background: '#fef2f2', borderColor: '#fca5a5', marginBottom: '1.5rem', color: '#991b1b' }}>
-            <strong>Error:</strong> {errorMessage}
+            <strong>⚠️ Error:</strong> {errorMessage}
           </div>
         )}
 
@@ -323,6 +458,7 @@ export default function ReportForm() {
               <input
                 type="file"
                 id="photo_input"
+                ref={fileInputRef}
                 accept="image/*"
                 capture="environment"
                 onChange={handlePhotoChange}
@@ -332,7 +468,6 @@ export default function ReportForm() {
                 {photoPreview ? (
                   <div className="preview-container">
                     <img src={photoPreview} alt="Upload Preview" className="img-preview" />
-                    <span className="btn btn-secondary btn-sm change-photo-btn">Change Photo</span>
                   </div>
                 ) : (
                   <div className="upload-placeholder">
@@ -343,9 +478,19 @@ export default function ReportForm() {
                 )}
               </label>
             </div>
+            {photoPreview && (
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
+                <label htmlFor="photo_input" className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
+                  📷 Change Photo
+                </label>
+                <button type="button" className="btn btn-danger btn-sm" onClick={removePhoto}>
+                  ✕ Remove
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Location Capture */}
+          {/* Location Capture with Leaflet Map */}
           <div className="form-group">
             <label className="form-label">
               3. Issue Location <span style={{ color: '#dc2626' }}>*</span>
@@ -366,6 +511,24 @@ export default function ReportForm() {
               )}
             </div>
 
+            {/* Leaflet Map with draggable pin */}
+            <div className="map-container" style={{ marginTop: '0.75rem' }}>
+              <MapContainer
+                center={mapPosition || [19.076, 72.8777]}
+                zoom={mapPosition ? 16 : 12}
+                style={{ height: '280px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <LocationMarker position={mapPosition} onPositionChange={handleMapPositionChange} />
+                {mapPosition && <RecenterMap position={mapPosition} />}
+              </MapContainer>
+              <p className="map-hint">💡 Click on the map or drag the pin to fine-tune the exact location of the issue.</p>
+            </div>
+
             <div className="grid-2" style={{ marginTop: '0.75rem' }}>
               <div>
                 <label className="det-label">Latitude</label>
@@ -374,7 +537,7 @@ export default function ReportForm() {
                   className="form-control"
                   placeholder="e.g. 19.076000"
                   value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
+                  onChange={handleLatChange}
                   required
                 />
               </div>
@@ -385,7 +548,7 @@ export default function ReportForm() {
                   className="form-control"
                   placeholder="e.g. 72.877700"
                   value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
+                  onChange={handleLonChange}
                   required
                 />
               </div>
@@ -418,8 +581,8 @@ export default function ReportForm() {
               required
               minLength={10}
             ></textarea>
-            <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-              {description.length}/10 characters minimum
+            <span style={{ fontSize: '0.75rem', color: description.length >= 10 ? '#166534' : '#64748b' }}>
+              {description.length}/10 characters minimum {description.length >= 10 && '✅'}
             </span>
           </div>
 
@@ -429,7 +592,14 @@ export default function ReportForm() {
             style={{ width: '100%', marginTop: '1rem' }}
             disabled={submitting}
           >
-            {submitting ? 'Submitting & Analyzing Photo...' : '🚀 Submit Municipal Report'}
+            {submitting ? (
+              <>
+                <span className="btn-spinner"></span>
+                Submitting & Analyzing Photo...
+              </>
+            ) : (
+              '🚀 Submit Municipal Report'
+            )}
           </button>
         </form>
       </div>
@@ -494,9 +664,6 @@ export default function ReportForm() {
           object-fit: cover;
           box-shadow: var(--shadow-sm);
         }
-        .change-photo-btn {
-          margin-top: 0.75rem;
-        }
         .location-action-bar {
           display: flex;
           align-items: center;
@@ -510,6 +677,28 @@ export default function ReportForm() {
           background: #dcfce7;
           padding: 0.3rem 0.65rem;
           border-radius: var(--radius-full);
+        }
+        .map-container {
+          position: relative;
+        }
+        .map-hint {
+          font-size: 0.78rem;
+          color: var(--text-muted);
+          margin-top: 0.4rem;
+          font-style: italic;
+        }
+        .btn-spinner {
+          display: inline-block;
+          width: 16px;
+          height: 16px;
+          border: 2px solid #ffffff;
+          border-top-color: transparent;
+          border-radius: 50%;
+          animation: spin 0.6s linear infinite;
+          margin-right: 0.5rem;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

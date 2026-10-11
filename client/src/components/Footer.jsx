@@ -2,6 +2,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 export default function Footer() {
   return (
     <footer className="footer-root">
@@ -43,7 +45,7 @@ export default function Footer() {
         </div>
 
         <div className="footer-bottom">
-          <p>&copy; {new Date().getFullYear()} Civic Sense &mdash; Citizen Municipal Issue Resolution Portal.</p>
+          <p>&copy; {CURRENT_YEAR} Civic Sense &mdash; Citizen Municipal Issue Resolution Portal.</p>
           <div className="footer-badge">
             <span className="live-dot"></span> System Live & Operational
           </div>

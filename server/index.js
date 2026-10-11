@@ -85,10 +85,13 @@ if (fs.existsSync(clientDist)) {
   });
 }
 
-// Start listening
-const server = app.listen(PORT, () => {
-  console.log(`[Civic Sense API] Server running on http://localhost:${PORT}`);
-  console.log(`[Civic Sense UI] Web App accessible on http://localhost:${PORT} or Vite dev server at http://localhost:5173`);
-});
+// Start listening if run directly
+let server = null;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`[Civic Sense API] Server running on http://localhost:${PORT}`);
+    console.log(`[Civic Sense UI] Web App accessible on http://localhost:${PORT} or Vite dev server at http://localhost:5173`);
+  });
+}
 
 module.exports = { app, server };

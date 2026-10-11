@@ -1,12 +1,13 @@
 // server/test_api.js
 // Automated verification for Part 1 API contract
-const http = require('http');
-const { app, server } = require('./index');
-
-const PORT = server.address().port;
-const BASE_URL = `http://localhost:${PORT}`;
+const { app } = require('./index');
 
 async function testEndpoints() {
+  const server = app.listen(0);
+  await new Promise((resolve) => server.once('listening', resolve));
+  const PORT = server.address().port;
+  const BASE_URL = `http://localhost:${PORT}`;
+
   console.log(`Running API contract checks against ${BASE_URL}...`);
 
   const checks = [
