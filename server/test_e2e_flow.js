@@ -3,16 +3,18 @@
 // Report -> Duplicate Merge -> Priority Rise -> Track -> Authority Update
 const fs = require('fs');
 const path = require('path');
-const { app, server } = require('./index');
-
-const PORT = server.address().port;
-const BASE_URL = `http://localhost:${PORT}`;
+const { app } = require('./index');
 
 async function runE2E() {
   console.log('--- Running Full End-to-End Civic Flow Test ---');
   let complaintId = null;
+  let server = null;
 
   try {
+    server = app.listen(0);
+    await new Promise((resolve) => server.once('listening', resolve));
+    const PORT = server.address().port;
+    const BASE_URL = `http://localhost:${PORT}`;
     // Generate fresh coordinates for this test run
     const randOffset = Math.random() * 0.1;
     const baseLat = 19.200000 + randOffset;
@@ -78,8 +80,24 @@ async function runE2E() {
     }
     console.log('[PASS] Tracking verifies merged report count and history timeline');
 
-    // 4. Authority updates status: submitted -> in_progress
-    console.log('\n4. Authority updating status to in_progress...');
+    // 4. Authority updates status: submitted -> under_review -> in_progress
+    console.log('\n4. Authority updating status: submitted -> under_review...');
+    const reviewRes = await fetch(`${BASE_URL}/api/complaints/${complaintId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: 'under_review',
+        note: 'Assigned to field inspection officer'
+      })
+    });
+    const reviewData = await reviewRes.json();
+    console.log('PATCH (under_review) Response:', reviewData);
+
+    if (reviewRes.status !== 200 || reviewData.status !== 'under_review') {
+      throw new Error(`Failed to update status to under_review: ${JSON.stringify(reviewData)}`);
+    }
+
+    console.log('\n4b. Authority updating status: under_review -> in_progress...');
     const patchRes = await fetch(`${BASE_URL}/api/complaints/${complaintId}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -89,12 +107,12 @@ async function runE2E() {
       })
     });
     const patchData = await patchRes.json();
-    console.log('PATCH Response:', patchData);
+    console.log('PATCH (in_progress) Response:', patchData);
 
     if (patchRes.status !== 200 || patchData.status !== 'in_progress') {
-      throw new Error(`Failed to update status: ${JSON.stringify(patchData)}`);
+      throw new Error(`Failed to update status to in_progress: ${JSON.stringify(patchData)}`);
     }
-    console.log('[PASS] Authority successfully updated status');
+    console.log('[PASS] Authority successfully updated status through valid lifecycle');
 
     // 5. Citizen re-tracks to confirm updated status
     console.log('\n5. Citizen re-tracking to see authority resolution update...');
@@ -110,7 +128,11 @@ async function runE2E() {
     server.close(() => process.exit(0));
   } catch (err) {
     console.error('[E2E FAILED]:', err.message);
-    server.close(() => process.exit(1));
+    if (server) {
+      server.close(() => process.exit(1));
+    } else {
+      process.exit(1);
+    }
   }
 }
 

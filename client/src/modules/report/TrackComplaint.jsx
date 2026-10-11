@@ -37,18 +37,22 @@ export default function TrackComplaint() {
   const navigate = useNavigate();
 
   const [searchId, setSearchId] = useState(urlComplaintId || '');
+  const [prevUrlId, setPrevUrlId] = useState(urlComplaintId);
   const [complaint, setComplaint] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [searched, setSearched] = useState(false);
+  const [loading, setLoading] = useState(Boolean(urlComplaintId));
   const [error, setError] = useState(null);
   const [supporting, setSupporting] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
+
+  if (urlComplaintId !== prevUrlId) {
+    setPrevUrlId(urlComplaintId);
+    setSearchId(urlComplaintId || '');
+  }
 
   const fetchComplaint = (id) => {
     if (!id || !id.trim()) return;
     setLoading(true);
     setError(null);
-    setSearched(true);
     setSupportMsg('');
 
     fetch(`${API_BASE}/api/complaints/${id.trim()}`)
@@ -74,8 +78,25 @@ export default function TrackComplaint() {
 
   useEffect(() => {
     if (urlComplaintId) {
-      setSearchId(urlComplaintId);
-      fetchComplaint(urlComplaintId);
+      fetch(`${API_BASE}/api/complaints/${urlComplaintId.trim()}`)
+        .then((res) => {
+          if (!res.ok) {
+            if (res.status === 404) {
+              throw new Error(`Complaint ID "${urlComplaintId}" was not found in our records. Please verify the format (e.g. CS-2026-00001).`);
+            }
+            throw new Error('Unable to connect to complaint service.');
+          }
+          return res.json();
+        })
+        .then((data) => {
+          setComplaint(data);
+          setLoading(false);
+        })
+        .catch((err) => {
+          setError(err.message);
+          setComplaint(null);
+          setLoading(false);
+        });
     }
   }, [urlComplaintId]);
 

@@ -1,7 +1,7 @@
 // client/src/modules/report/ReportForm.jsx
 // Owner: Tanush (Complaint Submission & Tracking Module)
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -58,7 +58,6 @@ function RecenterMap({ position }) {
 
 export default function ReportForm() {
   const { categoryId: urlCategoryId } = useParams();
-  const navigate = useNavigate();
 
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(urlCategoryId || '');
@@ -83,11 +82,11 @@ export default function ReportForm() {
       .then((res) => res.json())
       .then((data) => {
         setCategories(data);
-        if (urlCategoryId && !selectedCategory) {
-          setSelectedCategory(urlCategoryId);
-        } else if (!selectedCategory && data.length > 0) {
-          setSelectedCategory(data[0].id);
-        }
+        setSelectedCategory((prev) => {
+          if (urlCategoryId) return urlCategoryId;
+          if (!prev && data.length > 0) return data[0].id;
+          return prev;
+        });
       })
       .catch((err) => console.error('Failed to load categories:', err));
   }, [urlCategoryId]);

@@ -70,8 +70,8 @@ export default function AuthorityDashboard() {
       .catch((err) => console.error('Error fetching categories:', err));
   }, []);
 
-  const fetchQueue = () => {
-    setLoading(true);
+  const fetchQueue = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     fetch(`${API_BASE}/api/authority/complaints`)
       .then((res) => res.json())
       .then((data) => {
@@ -102,7 +102,23 @@ export default function AuthorityDashboard() {
   };
 
   useEffect(() => {
-    fetchQueue();
+    fetch(`${API_BASE}/api/authority/complaints`)
+      .then((res) => res.json())
+      .then((data) => {
+        setComplaints(data);
+        if (data.length > 0) {
+          setSelectedComplaint(data[0]);
+          fetch(`${API_BASE}/api/complaints/${data[0].id}`)
+            .then((r) => r.json())
+            .then((d) => setDetailData(d))
+            .catch(() => setDetailData(null));
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error('Error fetching authority queue:', err);
+        setLoading(false);
+      });
   }, []);
 
   const handleStatusUpdate = async (newStatus) => {
