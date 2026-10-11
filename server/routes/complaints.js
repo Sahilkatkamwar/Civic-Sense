@@ -8,7 +8,7 @@ const multer = require('multer');
 const db = require('../db/db');
 const { computeHash, hammingDistance, distanceMeters } = require('../services/duplicate');
 const { calculatePriority, recalculateAllOpen } = require('../services/priority');
-const { isValidTransition, getAuthorityForCategory } = require('../services/routing');
+const { isValidTransition, getAllowedTransitions, getAuthorityForCategory } = require('../services/routing');
 
 // Setup multer storage for complaint photos
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -116,18 +116,37 @@ router.get('/', (req, res) => {
 // GET /api/authority/complaints - Authority queue sorted by priority
 router.get('/authority/queue', (req, res) => {
   try {
-    // Recalculate priority for all open complaints first
+    // Recalculate priority for all open complaints first (keeps days_open current)
     recalculateAllOpen(db);
 
-    const complaints = db.prepare(`
+    const { status, category, priority } = req.query;
+
+    let query = `
       SELECT c.*, cat.name AS category_name, cat.icon AS category_icon, cat.severity_weight,
              a.name AS authority_name, a.department AS authority_department
       FROM complaints c
       LEFT JOIN categories cat ON c.category_id = cat.id
       LEFT JOIN authorities a ON c.authority_id = a.id
-      ORDER BY c.priority_score DESC, c.created_at DESC
-    `).all();
+      WHERE 1=1
+    `;
+    const params = [];
 
+    if (status && status !== 'all') {
+      query += ` AND c.status = ?`;
+      params.push(status);
+    }
+    if (category && category !== 'all') {
+      query += ` AND c.category_id = ?`;
+      params.push(category);
+    }
+    if (priority && priority !== 'all') {
+      query += ` AND c.priority_level = ?`;
+      params.push(priority);
+    }
+
+    query += ` ORDER BY c.priority_score DESC, c.created_at DESC`;
+
+    const complaints = db.prepare(query).all(...params);
     res.json(complaints);
   } catch (err) {
     console.error('Error fetching authority complaints:', err);
@@ -157,9 +176,13 @@ router.get('/:id', (req, res) => {
       ORDER BY created_at ASC
     `).all(req.params.id);
 
+    // Get allowed next statuses for the current state
+    const allowedTransitions = getAllowedTransitions(complaint.status);
+
     res.json({
       ...complaint,
-      status_history: history
+      status_history: history,
+      allowed_transitions: allowedTransitions
     });
   } catch (err) {
     console.error('Error tracking complaint:', err);
@@ -256,6 +279,20 @@ router.post('/', upload.single('photo'), async (req, res) => {
         WHERE id = ?
       `).run(newCount, score, level, matchedComplaint.id);
 
+      // Record this as a duplicate submission in the new complaint row too
+      const dupeId = getNextComplaintId();
+      db.prepare(`
+        INSERT INTO complaints (
+          id, category_id, description, photo_path, photo_hash,
+          latitude, longitude, address_text, status, report_count,
+          duplicate_of, authenticity, priority_score, priority_level,
+          authority_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'submitted', 1, ?, ?, 0, 'low', ?)
+      `).run(
+        dupeId, category_id, description.trim(), photoPath, photoHash,
+        lat, lon, address_text || null, matchedComplaint.id, authenticity, authorityId
+      );
+
       db.prepare(`
         INSERT INTO status_history (complaint_id, status, note)
         VALUES (?, ?, ?)
@@ -273,6 +310,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
         authority_name: authority ? authority.name : 'Municipal Authority',
         duplicate: true,
         duplicate_of: matchedComplaint.id,
+        duplicate_case: duplicateCase,
         message: `This issue is already reported under ID ${matchedComplaint.id}. We have added your report to raise its priority.`
       });
     }
@@ -299,7 +337,7 @@ router.post('/', upload.single('photo'), async (req, res) => {
       authorityId
     );
 
-    // Initial status history
+    // Initial status history entry
     db.prepare(`
       INSERT INTO status_history (complaint_id, status, note)
       VALUES (?, 'submitted', ?)
@@ -335,8 +373,10 @@ router.patch('/:id/status', (req, res) => {
     }
 
     if (!isValidTransition(complaint.status, newStatus)) {
+      const allowed = getAllowedTransitions(complaint.status);
       return res.status(400).json({
-        error: `Invalid status transition from '${complaint.status}' to '${newStatus}'`
+        error: `Invalid status transition from '${complaint.status}' to '${newStatus}'. Allowed next statuses: ${allowed.join(', ') || 'none'}`,
+        allowed_transitions: allowed
       });
     }
 
@@ -355,11 +395,67 @@ router.patch('/:id/status', (req, res) => {
     res.json({
       id: req.params.id,
       status: newStatus,
+      previous_status: complaint.status,
+      allowed_transitions: getAllowedTransitions(newStatus),
       message: `Status updated to ${newStatus}`
     });
   } catch (err) {
     console.error('Error updating status:', err);
     res.status(500).json({ error: 'Failed to update complaint status' });
+  }
+});
+
+// POST /api/complaints/:id/support - "I face this too" button (Bonus feature)
+router.post('/:id/support', (req, res) => {
+  try {
+    const complaint = db.prepare(`
+      SELECT c.*, cat.severity_weight
+      FROM complaints c
+      JOIN categories cat ON c.category_id = cat.id
+      WHERE c.id = ?
+    `).get(req.params.id);
+
+    if (!complaint) {
+      return res.status(404).json({ error: `Complaint '${req.params.id}' not found` });
+    }
+
+    if (complaint.status === 'resolved' || complaint.status === 'rejected') {
+      return res.status(400).json({ error: 'Cannot support a resolved or rejected complaint' });
+    }
+
+    const newCount = complaint.report_count + 1;
+    const { score, level } = calculatePriority({
+      report_count: newCount,
+      severity_weight: complaint.severity_weight,
+      created_at: complaint.created_at,
+      authenticity: complaint.authenticity
+    });
+
+    db.prepare(`
+      UPDATE complaints
+      SET report_count = ?, priority_score = ?, priority_level = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newCount, score, level, req.params.id);
+
+    db.prepare(`
+      INSERT INTO status_history (complaint_id, status, note)
+      VALUES (?, ?, ?)
+    `).run(
+      req.params.id,
+      complaint.status,
+      `A citizen confirmed this issue (Total supporters: ${newCount}). Priority updated to ${level}.`
+    );
+
+    res.json({
+      id: req.params.id,
+      report_count: newCount,
+      priority_score: score,
+      priority_level: level,
+      message: `Thank you! ${newCount} citizens have now reported this issue.`
+    });
+  } catch (err) {
+    console.error('Error supporting complaint:', err);
+    res.status(500).json({ error: 'Failed to add support to complaint' });
   }
 });
 
