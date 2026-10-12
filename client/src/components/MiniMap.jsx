@@ -1,6 +1,16 @@
 // client/src/components/MiniMap.jsx
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import { getPriorityConfig, getCategoryConfig } from '../utils/civicHelpers';
+
+// Fix Leaflet icons
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+});
 
 export default function MiniMap({ complaints = [] }) {
   const mapContainerRef = useRef(null);
@@ -9,7 +19,6 @@ export default function MiniMap({ complaints = [] }) {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Default center (Mumbai municipal area or first complaint coords)
     const defaultLat = complaints.length > 0 && complaints[0].latitude ? complaints[0].latitude : 19.0760;
     const defaultLng = complaints.length > 0 && complaints[0].longitude ? complaints[0].longitude : 72.8777;
 
@@ -34,46 +43,53 @@ export default function MiniMap({ complaints = [] }) {
       }
     });
 
-    // Add marker for each complaint with valid coordinates
     const validMarkers = [];
     complaints.forEach((c) => {
       if (c.latitude && c.longitude) {
-        // Custom emoji div icon
+        const prio = getPriorityConfig(c.priority_level);
+        const cat = getCategoryConfig(c.category_id);
+
         const iconHtml = `
           <div style="
-            background: #ffffff;
-            border: 2px solid ${c.priority_level === 'critical' ? '#dc2626' : c.priority_level === 'high' ? '#ea580c' : '#2563eb'};
+            background: ${prio.color};
+            color: #ffffff;
+            border: 2px solid #ffffff;
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 11px;
+            font-weight: 700;
             box-shadow: 0 2px 6px rgba(0,0,0,0.3);
           ">
-            ${c.category_icon || '📌'}
+            ${c.report_count > 1 ? c.report_count : '•'}
           </div>
         `;
 
         const customIcon = L.divIcon({
           html: iconHtml,
-          className: 'custom-map-pin',
-          iconSize: [32, 32],
-          iconAnchor: [16, 16]
+          className: 'custom-minimap-pin',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14]
         });
 
         const marker = L.marker([c.latitude, c.longitude], { icon: customIcon }).addTo(map);
 
         const popupContent = `
-          <div style="font-family: inherit; font-size: 13px; line-height: 1.4; padding: 2px;">
-            <strong style="color: #1e40af; font-family: monospace;">${c.id}</strong><br/>
-            <strong>${c.category_name || c.category_id}</strong><br/>
-            <span style="color: #64748b; font-size: 11px;">${c.address_text || 'Coordinates: ' + c.latitude + ', ' + c.longitude}</span><br/>
-            <span style="display: inline-block; margin-top: 4px; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; background: #eff6ff; color: #1e40af;">
-              Priority: ${c.priority_level} (${c.priority_score})
-            </span><br/>
-            <a href="/track/${c.id}" style="color: #2563eb; display: inline-block; margin-top: 6px; font-weight: 600; text-decoration: none;">Track this &rarr;</a>
+          <div style="font-family: var(--font-sans); font-size: 12px; line-height: 1.4; padding: 4px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <strong style="color: #0b2545; font-family: var(--font-mono);">${c.id}</strong>
+              <span style="background: ${prio.bgColor}; color: ${prio.color}; padding: 1px 5px; border-radius: 4px; font-size: 10px; font-weight: 700;">
+                ${prio.shortLabel}
+              </span>
+            </div>
+            <div style="font-weight: 700; color: #0c1a30; margin-bottom: 2px;">${c.category_name || cat.name}</div>
+            <div style="color: #52637a; font-size: 11px; margin-bottom: 6px;">${c.address_text || 'Nearby Coordinates'}</div>
+            <a href="/track/${c.id}" style="color: #c2410c; font-weight: 700; text-decoration: none; font-size: 11px;">
+              Inspect Track Record &rarr;
+            </a>
           </div>
         `;
 
@@ -89,19 +105,18 @@ export default function MiniMap({ complaints = [] }) {
   }, [complaints]);
 
   return (
-    <div className="mini-map-wrapper">
-      <div ref={mapContainerRef} style={{ width: '100%', height: '360px', borderRadius: 'var(--radius-lg)' }} />
+    <div className="mini-map-root">
+      <div ref={mapContainerRef} style={{ width: '100%', height: '380px' }} />
       <style>{`
-        .mini-map-wrapper {
-          position: relative;
-          box-shadow: var(--shadow-md);
+        .mini-map-root {
           border-radius: var(--radius-lg);
           overflow: hidden;
           border: 1px solid var(--border);
+          box-shadow: var(--shadow-sm);
         }
-        .custom-map-pin {
-          background: transparent;
-          border: none;
+        .custom-minimap-pin {
+          background: transparent !important;
+          border: none !important;
         }
       `}</style>
     </div>

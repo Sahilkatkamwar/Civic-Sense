@@ -1,18 +1,23 @@
 // client/src/modules/issues/IssueList.jsx
-// Owner: Sujal (Issue Explorer Module)
+// Municipal Issue Explorer & Safety Protocols Directory
 import React, { useState, useEffect } from 'react';
+import {
+  Search,
+  AlertTriangle,
+  Zap,
+  ShieldAlert
+} from 'lucide-react';
 import CategoryCard from './CategoryCard';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Group mapping for civic issue domains
 const CATEGORY_GROUPS = {
-  pothole: 'Road',
-  garbage: 'Waste',
-  tree: 'Other',
-  cable: 'Safety',
-  animal: 'Safety',
-  other: 'Other'
+  pothole: 'Roads',
+  garbage: 'Sanitation',
+  tree: 'Parks & Environment',
+  cable: 'Electrical Safety',
+  animal: 'Public Health',
+  other: 'General Civic'
 };
 
 export default function IssueList() {
@@ -20,12 +25,10 @@ export default function IssueList() {
   const [search, setSearch] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [filterHighRisk, setFilterHighRisk] = useState(false);
-  const [mostReportedId, setMostReportedId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => {
-    // 1. Fetch categories
     fetch(`${API_BASE}/api/categories`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch categories');
@@ -36,45 +39,19 @@ export default function IssueList() {
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
+        setLoadError(err.message);
         setLoading(false);
-      });
-
-    // 2. Bonus: Fetch complaints to identify "Most reported right now" category
-    fetch(`${API_BASE}/api/complaints`)
-      .then((res) => (res.ok ? res.json() : []))
-      .then((complaints) => {
-        if (Array.isArray(complaints) && complaints.length > 0) {
-          const counts = {};
-          complaints.forEach((c) => {
-            if (c.category_id) {
-              counts[c.category_id] = (counts[c.category_id] || 0) + (c.report_count || 1);
-            }
-          });
-          let maxCat = null;
-          let maxCount = 0;
-          for (const [catId, count] of Object.entries(counts)) {
-            if (count > maxCount) {
-              maxCount = count;
-              maxCat = catId;
-            }
-          }
-          setMostReportedId(maxCat);
-        }
-      })
-      .catch(() => {
-        // Non-blocking bonus check
       });
   }, []);
 
-  const groups = ['All', 'Road', 'Waste', 'Safety', 'Other'];
+  const groups = ['All', 'Roads', 'Sanitation', 'Electrical Safety', 'Parks & Environment', 'Public Health', 'General Civic'];
 
   const filteredCategories = categories.filter((cat) => {
     const matchesSearch =
       cat.name.toLowerCase().includes(search.toLowerCase()) ||
       cat.description.toLowerCase().includes(search.toLowerCase());
 
-    const group = CATEGORY_GROUPS[cat.id] || 'Other';
+    const group = CATEGORY_GROUPS[cat.id] || 'General Civic';
     const matchesGroup = selectedGroup === 'All' || group === selectedGroup;
     const matchesHighRisk = !filterHighRisk || cat.severity_weight >= 4 || cat.id === 'cable';
 
@@ -84,271 +61,195 @@ export default function IssueList() {
   return (
     <div className="container page-wrapper">
       {/* Emergency Guidance Banner */}
-      <div className="emergency-banner">
-        <span className="emergency-icon">🚨</span>
-        <div className="emergency-text">
-          <strong>Immediate Life Safety Hazard?</strong> For active sparking or snapped high-voltage power cables, keep 10+ meters away and call the emergency grid desk immediately (<strong>1912 / 112</strong>).
+      <div className="emergency-guidance-banner">
+        <div className="em-banner-icon-box">
+          <Zap size={20} className="text-red-600" />
+        </div>
+        <div className="em-banner-content">
+          <strong>Immediate Life Safety Hazard?</strong> For active sparking or snapped high-voltage power cables, keep at least 10 meters away and call the emergency grid desk immediately (<strong>1912 / 112</strong>).
         </div>
       </div>
 
+      {/* Header */}
       <div className="issues-header">
-        <span className="badge badge-low">Issue Directory</span>
-        <h1 className="page-title">Explore Civic Issues</h1>
+        <div className="breadcrumb-row">
+          <span>नागरिक अधिकार पत्र / Citizen Services</span>
+          <span>/</span>
+          <span className="text-slate-900 font-bold">नागरिक चार्टर एवं सुरक्षा संदर्शिका / Citizen Charter</span>
+        </div>
+        <div className="gov-seal-box" style={{ marginBottom: '0.5rem' }}>
+          मानक संचालन प्रक्रिया / STANDARD OPERATING PROCEDURES (SOP)
+        </div>
+        <h1 className="page-heading">Citizen Charter & Municipal Safety Protocols</h1>
         <p className="page-subtitle">
-          Browse municipal issue categories, learn official response guidelines, understand which department resolves each problem, and report with one click.
+          Statutory hazard classifications, safety guidelines for citizens, responsible municipal departments, and legal SLA redressal limits under urban local body regulations.
         </p>
       </div>
 
-      <div className="issues-controls">
-        <div className="search-bar-wrapper">
-          <span className="search-icon">🔍</span>
+      {/* Search & Group Filters */}
+      <div className="issues-filter-bar">
+        <div className="search-box">
+          <Search size={15} className="search-icon" />
           <input
             type="text"
-            className="form-control search-input"
-            placeholder="Search issues by name or keyword (e.g. pothole, dangling cable, garbage)..."
+            className="search-input"
+            placeholder="Search hazard by keyword (pothole, wire, garbage)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          {search && (
-            <button className="clear-search-btn" onClick={() => setSearch('')}>
-              ✕
-            </button>
-          )}
         </div>
 
-        <div className="filter-chips">
+        <div className="group-chips-scroll">
           {groups.map((grp) => (
             <button
               key={grp}
-              className={`chip ${selectedGroup === grp && !filterHighRisk ? 'active' : ''}`}
-              onClick={() => {
-                setSelectedGroup(grp);
-                setFilterHighRisk(false);
-              }}
+              type="button"
+              className={`group-chip ${selectedGroup === grp ? 'group-chip-active' : ''}`}
+              onClick={() => setSelectedGroup(grp)}
             >
               {grp}
             </button>
           ))}
-          <button
-            className={`chip chip-danger ${filterHighRisk ? 'active-danger' : ''}`}
-            onClick={() => setFilterHighRisk(!filterHighRisk)}
-          >
-            ⚠️ High Risk Only
-          </button>
         </div>
+
+        <button
+          type="button"
+          className={`filter-toggle-btn ${filterHighRisk ? 'filter-toggle-active' : ''}`}
+          onClick={() => setFilterHighRisk(!filterHighRisk)}
+        >
+          <AlertTriangle size={13} />
+          <span>High Severity Only</span>
+        </button>
       </div>
 
-      {/* Loading Skeletons */}
-      {loading && (
-        <div className="grid-3 categories-grid">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="card skeleton-card">
-              <div className="skeleton-line skeleton-header"></div>
-              <div className="skeleton-line skeleton-title"></div>
-              <div className="skeleton-line skeleton-desc"></div>
-              <div className="skeleton-line skeleton-desc short"></div>
-              <div className="skeleton-line skeleton-footer"></div>
-            </div>
-          ))}
+      {/* Grid */}
+      {loading ? (
+        <div className="text-center" style={{ padding: '3rem 0' }}>
+          <div className="spinner" style={{ margin: '0 auto 1rem' }}></div>
+          <p style={{ color: 'var(--text-muted)' }}>Loading hazard directory...</p>
         </div>
-      )}
-
-      {error && (
-        <div className="card error-card">
-          <p>⚠️ {error}</p>
-          <button onClick={() => window.location.reload()} className="btn btn-outline btn-sm">
-            Retry
-          </button>
+      ) : loadError ? (
+        <div className="card text-center" style={{ padding: '2.5rem 1rem' }}>
+          <AlertTriangle size={32} className="text-red-500 mb-2 mx-auto" />
+          <h3>Failed to load hazard directory</h3>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem' }}>{loadError}</p>
         </div>
-      )}
-
-      {!loading && !error && filteredCategories.length === 0 && (
-        <div className="card empty-card">
-          <span className="empty-icon">🔎</span>
-          <h3>No issues match your search</h3>
-          <p>No civic issues match your current keywords or domain filters. Try resetting to view all categories.</p>
-          <button
-            onClick={() => {
-              setSearch('');
-              setSelectedGroup('All');
-              setFilterHighRisk(false);
-            }}
-            className="btn btn-secondary btn-sm"
-          >
-            Reset Filters
-          </button>
+      ) : filteredCategories.length === 0 ? (
+        <div className="card text-center" style={{ padding: '3.5rem 1rem' }}>
+          <ShieldAlert size={36} className="text-slate-400 mb-2 mx-auto" />
+          <h3>No categories match your criteria</h3>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+            Try resetting your search query or selecting "All" categories.
+          </p>
         </div>
-      )}
-
-      {!loading && !error && (
-        <div className="grid-3 categories-grid">
+      ) : (
+        <div className="grid-3">
           {filteredCategories.map((cat) => (
-            <CategoryCard
-              key={cat.id}
-              category={cat}
-              isMostReported={mostReportedId === cat.id}
-            />
+            <CategoryCard key={cat.id} category={cat} />
           ))}
         </div>
       )}
 
       <style>{`
-        .emergency-banner {
+        .emergency-guidance-banner {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
-          background: #fef2f2;
+          gap: 0.85rem;
+          background-color: #fef2f2;
           border: 1px solid #fecaca;
-          color: #991b1b;
-          padding: 0.75rem 1.25rem;
           border-radius: var(--radius-md);
+          padding: 0.85rem 1.25rem;
           margin-bottom: 2rem;
-          font-size: 0.9rem;
+          font-size: 0.85rem;
+          color: #991b1b;
         }
-        .emergency-icon {
-          font-size: 1.35rem;
+        .em-banner-icon-box {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: #fee2e2;
+          display: flex;
+          align-items: center;
+          justify-content: center;
           flex-shrink: 0;
         }
-        .emergency-text {
-          line-height: 1.45;
+        .em-banner-content strong {
+          color: #7f1d1d;
         }
         .issues-header {
-          text-align: center;
-          max-width: 680px;
-          margin: 0 auto 2.5rem;
+          margin-bottom: 1.75rem;
         }
-        .page-title {
-          font-size: 2.25rem;
-          font-weight: 800;
-          color: var(--text-main);
-          margin: 0.5rem 0 0.75rem;
-          letter-spacing: -0.02em;
-        }
-        .page-subtitle {
-          color: var(--text-muted);
-          font-size: 1.05rem;
-          line-height: 1.6;
-        }
-        .issues-controls {
+        .issues-filter-bar {
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 1.25rem;
+          gap: 1rem;
           margin-bottom: 2rem;
+          flex-wrap: wrap;
         }
-        .search-bar-wrapper {
+        .search-box {
           position: relative;
-          flex: 1;
+          display: flex;
+          align-items: center;
           min-width: 280px;
         }
-        .search-icon {
+        .search-box .search-icon {
           position: absolute;
-          left: 1.1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          font-size: 1rem;
-          color: #94a3b8;
+          left: 10px;
+          color: var(--text-muted);
         }
-        .search-input {
-          padding-left: 2.75rem !important;
-          padding-right: 2.5rem !important;
-          border-radius: var(--radius-full) !important;
-        }
-        .clear-search-btn {
-          position: absolute;
-          right: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          color: #94a3b8;
-          cursor: pointer;
-          font-size: 0.85rem;
-        }
-        .filter-chips {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 0.5rem;
-        }
-        .chip {
+        .search-box .search-input {
+          width: 100%;
+          padding: 0.5rem 0.75rem 0.5rem 2rem;
           border: 1px solid var(--border-strong);
-          background: #ffffff;
-          padding: 0.45rem 0.95rem;
-          border-radius: var(--radius-full);
-          font-size: 0.85rem;
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          color: var(--text-main);
-        }
-        .chip:hover {
-          border-color: var(--primary);
-        }
-        .chip.active {
-          background: var(--primary);
-          color: #ffffff;
-          border-color: var(--primary);
-        }
-        .chip-danger {
-          border-color: #fca5a5;
-          color: #b91c1c;
-        }
-        .chip-danger:hover {
-          background: #fef2f2;
-        }
-        .chip-danger.active-danger {
-          background: #dc2626;
-          color: #ffffff;
-          border-color: #dc2626;
-        }
-        .empty-card, .error-card {
-          text-align: center;
-          padding: 3.5rem 1.5rem;
-        }
-        .empty-icon {
-          font-size: 2.75rem;
-          margin-bottom: 0.75rem;
-          display: block;
-        }
-        /* Skeletons */
-        .skeleton-card {
-          min-height: 220px;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          padding: 1.5rem;
-        }
-        .skeleton-line {
-          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-          background-size: 200% 100%;
-          animation: shimmer 1.5s infinite;
-          border-radius: var(--radius-sm);
-        }
-        .skeleton-header {
-          width: 48px;
-          height: 48px;
           border-radius: var(--radius-md);
+          font-size: 0.8125rem;
+          background: #ffffff;
         }
-        .skeleton-title {
-          width: 60%;
-          height: 20px;
+        .group-chips-scroll {
+          display: flex;
+          gap: 0.35rem;
+          flex-wrap: wrap;
+          flex: 1;
         }
-        .skeleton-desc {
-          width: 100%;
-          height: 14px;
+        .group-chip {
+          background-color: #ffffff;
+          border: 1px solid var(--border);
+          padding: 0.35rem 0.75rem;
+          border-radius: var(--radius-full);
+          font-size: 0.775rem;
+          font-weight: 500;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s;
         }
-        .skeleton-desc.short {
-          width: 75%;
+        .group-chip:hover {
+          border-color: var(--primary);
+          color: var(--primary);
         }
-        .skeleton-footer {
-          width: 100%;
-          height: 36px;
-          margin-top: auto;
+        .group-chip-active {
+          background-color: var(--primary-light);
+          border-color: var(--primary);
+          color: var(--primary);
+          font-weight: 600;
         }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
+        .filter-toggle-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.35rem;
+          padding: 0.4rem 0.75rem;
+          border: 1px solid var(--border-strong);
+          border-radius: var(--radius-md);
+          background: #ffffff;
+          font-size: 0.775rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .filter-toggle-active {
+          background-color: #fee2e2;
+          border-color: #fca5a5;
+          color: #991b1b;
         }
       `}</style>
     </div>
