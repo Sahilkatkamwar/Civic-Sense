@@ -19,7 +19,7 @@ import {
   formatFullDateTime
 } from '../../utils/civicHelpers';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function IncidentDetailDrawer({
   incident,
@@ -229,7 +229,7 @@ export default function IncidentDetailDrawer({
           {incident.photo_path ? (
             <div className="photo-container">
               <img
-                src={incident.photo_path.startsWith('http') ? incident.photo_path : `${API_BASE}${incident.photo_path}`}
+                src={incident.photo_path.startsWith('http') ? incident.photo_path : `${API_BASE}${incident.photo_path.startsWith('/') ? '' : '/'}${incident.photo_path}`}
                 alt="Field evidence"
                 className="evidence-img"
                 onError={(e) => {

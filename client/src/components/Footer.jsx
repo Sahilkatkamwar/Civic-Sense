@@ -197,9 +197,13 @@ export default function Footer() {
         }
         .footer-grid {
           display: grid;
-          grid-template-columns: 1.5fr 1fr 1fr 1.25fr;
+          grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
           gap: 2.5rem;
           margin-bottom: 2.5rem;
+          width: 100%;
+        }
+        .footer-grid > div {
+          min-width: 0;
         }
 
         .footer-meta-col {
@@ -365,9 +369,10 @@ export default function Footer() {
           color: #e2e8f0;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1100px) {
           .footer-grid {
             grid-template-columns: 1fr 1fr;
+            gap: 2rem;
           }
         }
         @media (max-width: 640px) {

@@ -19,7 +19,7 @@ import {
   getCategoryConfig
 } from '../../utils/civicHelpers';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -84,8 +84,9 @@ export default function ReportForm() {
 
   useEffect(() => {
     fetch(`${API_BASE}/api/categories`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
+        if (!Array.isArray(data)) return;
         setCategories(data);
         if (urlCategoryId) {
           setSelectedCategory(urlCategoryId);
@@ -93,7 +94,7 @@ export default function ReportForm() {
           setSelectedCategory(data[0].id);
         }
       })
-      .catch((err) => console.error('Failed to load categories:', err));
+      .catch((err) => console.warn('Categories loading paused:', err.message));
   }, [urlCategoryId]);
 
   const handleGetLocation = () => {
@@ -572,9 +573,13 @@ export default function ReportForm() {
         }
         .report-form-layout {
           display: grid;
-          grid-template-columns: 1fr 360px;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 360px);
           gap: 1.75rem;
           align-items: flex-start;
+          width: 100%;
+        }
+        .report-main-form, .report-sidebar {
+          min-width: 0;
         }
         .report-main-form {
           padding: 1.75rem;
@@ -910,6 +915,23 @@ export default function ReportForm() {
           }
           .category-select-grid {
             grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 640px) {
+          .result-card {
+            padding: 1.25rem 1rem;
+          }
+          .duplicate-alert-box, .success-alert-box {
+            flex-direction: column;
+            gap: 0.75rem;
+          }
+          .dup-actions-row {
+            flex-direction: column;
+            width: 100%;
+          }
+          .dup-actions-row .btn {
+            width: 100%;
+            justify-content: center;
           }
         }
       `}</style>

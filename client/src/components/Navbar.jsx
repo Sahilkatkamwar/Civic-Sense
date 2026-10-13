@@ -17,6 +17,7 @@ import {
   Bell,
   Globe
 } from 'lucide-react';
+import AlertBell from '../modules/alerts/AlertBell';
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -74,6 +75,12 @@ export default function Navbar() {
       label: 'नागरिक चार्टर / Citizen Charter',
       shortLabel: 'Citizen Charter',
       icon: BookOpen
+    },
+    {
+      to: '/alerts',
+      label: 'नागरिक सूचनाएं / Alerts',
+      shortLabel: 'Alerts',
+      icon: Bell
     }
   ];
 
@@ -81,7 +88,7 @@ export default function Navbar() {
     <header className="navbar-root">
       {/* 1. Official Government Topbar */}
       <div className="gov-topbar">
-        <div className="container gov-topbar-container">
+        <div className="gov-topbar-container">
           <div className="gov-topbar-left">
             <div className="gov-emblem-badge">
               <Landmark size={14} className="text-amber-400" />
@@ -144,7 +151,7 @@ export default function Navbar() {
 
       {/* 3. Main Sovereign Navy Navigation Header */}
       <div className="gov-main-nav">
-        <div className="container nav-container">
+        <div className="nav-container">
           {/* Official Emblem & Platform Brand */}
           <Link to="/" className="brand-link" onClick={() => setMobileMenuOpen(false)}>
             <div className="gov-emblem-seal">
@@ -183,6 +190,7 @@ export default function Navbar() {
 
           {/* Right Status Badge & Mobile Toggle */}
           <div className="nav-right-meta">
+            <AlertBell />
             <div className="gov-status-pill" title="Public Service Guarantee Act Redressal Engine Online">
               <span className="live-dot pulse-ring"></span>
               <span className="status-text">PORTAL LIVE &bull; 24x7 REDRESSAL</span>
@@ -202,7 +210,7 @@ export default function Navbar() {
 
       {/* 4. Official Notice Ticker */}
       <div className="gov-notice-banner">
-        <div className="container gov-notice-inner">
+        <div className="gov-notice-inner">
           <div className="gov-notice-text">
             <span className="gov-notice-tag">आधिकारिक सूचना / PUBLIC NOTICE</span>
             <Bell size={13} className="text-amber-700" />
@@ -263,6 +271,11 @@ export default function Navbar() {
           align-items: center;
           justify-content: space-between;
           gap: 1rem;
+          width: 100%;
+          max-width: 1600px;
+          margin: 0 auto;
+          padding: 0 1.5rem;
+          box-sizing: border-box;
         }
         .gov-topbar-left {
           display: flex;
@@ -330,20 +343,25 @@ export default function Navbar() {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          height: 72px;
-          gap: 1.5rem;
+          height: 68px;
+          gap: 0.85rem;
+          width: 100%;
+          max-width: 1600px;
+          margin: 0 auto;
+          padding: 0 1.5rem;
+          box-sizing: border-box;
         }
         .brand-link {
           display: flex;
           align-items: center;
-          gap: 0.85rem;
+          gap: 0.65rem;
           color: inherit;
           text-decoration: none !important;
           flex-shrink: 0;
         }
         .gov-emblem-seal {
-          width: 44px;
-          height: 44px;
+          width: 40px;
+          height: 40px;
           background: radial-gradient(circle, #133b6b 0%, #07192f 100%);
           border: 2px solid #f59e0b;
           border-radius: 50%;
@@ -360,44 +378,48 @@ export default function Navbar() {
         .brand-name-row {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
+          gap: 0.45rem;
         }
         .brand-name {
-          font-size: 1.25rem;
+          font-size: 1.15rem;
           font-weight: 900;
           letter-spacing: 0.02em;
           color: #ffffff;
           font-family: var(--font-sans);
+          white-space: nowrap;
         }
         .gov-seal-pill {
-          font-size: 0.625rem;
+          font-size: 0.6rem;
           font-weight: 800;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.04em;
           color: #fef08a;
           background: rgba(180, 83, 9, 0.4);
           border: 1px solid #f59e0b;
-          padding: 1px 6px;
+          padding: 1px 5px;
           border-radius: 3px;
+          white-space: nowrap;
         }
         .brand-subtitle {
-          font-size: 0.72rem;
+          font-size: 0.68rem;
           color: #93c5fd;
           font-weight: 600;
           letter-spacing: -0.01em;
+          white-space: nowrap;
         }
 
         /* Nav links */
         .desktop-nav {
           display: flex;
           align-items: center;
-          gap: 0.2rem;
+          gap: 0.15rem;
+          flex-shrink: 0;
         }
         .nav-item {
           display: inline-flex;
           align-items: center;
-          gap: 0.4rem;
-          padding: 0.5rem 0.7rem;
-          font-size: 0.8125rem;
+          gap: 0.32rem;
+          padding: 0.38rem 0.55rem;
+          font-size: 0.8rem;
           font-weight: 600;
           color: #e2e8f0;
           border-radius: var(--radius-xs);
@@ -422,21 +444,23 @@ export default function Navbar() {
         .nav-right-meta {
           display: flex;
           align-items: center;
-          gap: 0.75rem;
+          gap: 0.65rem;
           flex-shrink: 0;
+          margin-left: 0.35rem;
         }
         .gov-status-pill {
           display: inline-flex;
           align-items: center;
-          gap: 0.45rem;
-          padding: 0.35rem 0.75rem;
+          gap: 0.4rem;
+          padding: 0.3rem 0.65rem;
           background-color: #052e16;
           border: 1px solid #15803d;
           border-radius: var(--radius-xs);
-          font-size: 0.7rem;
+          font-size: 0.68rem;
           font-weight: 700;
           color: #86efac;
-          letter-spacing: 0.04em;
+          letter-spacing: 0.03em;
+          white-space: nowrap;
         }
         .live-dot {
           width: 7px;
@@ -468,12 +492,19 @@ export default function Navbar() {
           align-items: center;
           justify-content: space-between;
           gap: 1rem;
+          width: 100%;
+          max-width: 1600px;
+          margin: 0 auto;
+          padding: 0 1.5rem;
+          box-sizing: border-box;
         }
         .gov-notice-text {
           display: flex;
           align-items: center;
           gap: 0.5rem;
           line-height: 1.4;
+          min-width: 0;
+          flex: 1;
         }
         .gov-notice-tag {
           background: #b45309;
@@ -484,12 +515,14 @@ export default function Navbar() {
           border-radius: 2px;
           letter-spacing: 0.03em;
           white-space: nowrap;
+          flex-shrink: 0;
         }
         .gov-toll-free-badge {
           font-weight: 700;
           color: #92400e;
           white-space: nowrap;
           font-size: 0.75rem;
+          flex-shrink: 0;
         }
 
         /* Mobile nav drawer */
@@ -523,7 +556,39 @@ export default function Navbar() {
           border-left-color: #f59e0b;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1560px) {
+          .brand-subtitle {
+            display: none;
+          }
+          .gov-seal-pill {
+            display: none;
+          }
+          .desktop-nav .nav-item {
+            padding: 0.35rem 0.45rem;
+            font-size: 0.775rem;
+            gap: 0.22rem;
+          }
+          .nav-container {
+            gap: 0.5rem;
+          }
+          .gov-status-pill .status-text {
+            font-size: 0.65rem;
+          }
+        }
+
+        @media (max-width: 1360px) {
+          .desktop-nav .nav-icon {
+            display: none;
+          }
+          .gov-status-pill .status-text {
+            display: none;
+          }
+          .gov-status-pill {
+            padding: 0.35rem 0.5rem;
+          }
+        }
+
+        @media (max-width: 1220px) {
           .gov-topbar-left .gov-ministry-text {
             display: none;
           }
@@ -532,12 +597,29 @@ export default function Navbar() {
           }
           .mobile-toggle-btn {
             display: flex;
+            align-items: center;
+            justify-content: center;
           }
           .mobile-nav-drawer {
             display: block;
           }
         }
+
+        @media (max-width: 900px) {
+          .gov-notice-inner {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.35rem;
+          }
+          .gov-toll-free-badge {
+            display: none;
+          }
+        }
+
         @media (max-width: 768px) {
+          .nav-container {
+            height: 60px;
+          }
           .gov-topbar-right .gov-helpline-chip {
             display: none;
           }
@@ -545,6 +627,38 @@ export default function Navbar() {
             display: none;
           }
           .brand-subtitle {
+            display: none;
+          }
+          .gov-notice-banner {
+            font-size: 0.72rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .nav-container {
+            gap: 0.5rem;
+          }
+          .brand-name {
+            font-size: 1.05rem;
+          }
+          .gov-emblem-seal {
+            width: 34px;
+            height: 34px;
+          }
+          .gov-seal-pill {
+            display: none;
+          }
+          .gov-status-pill {
+            display: none;
+          }
+          .gov-topbar-left {
+            font-size: 0.65rem;
+          }
+          .gov-a-btn {
+            padding: 1px 3px;
+            font-size: 0.6rem;
+          }
+          .gov-notice-tag {
             display: none;
           }
         }

@@ -14,7 +14,7 @@ import {
   getPriorityConfig
 } from '../../utils/civicHelpers';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function AnalyticsDashboard() {
   const [complaints, setComplaints] = useState([]);
@@ -29,16 +29,16 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/api/complaints?sort=priority`).then((r) => r.json()),
-      fetch(`${API_BASE}/api/complaints/stats`).then((r) => r.json())
+      fetch(`${API_BASE}/api/complaints?sort=priority`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`${API_BASE}/api/complaints/stats`).then((r) => (r.ok ? r.json() : {})).catch(() => ({}))
     ])
       .then(([complaintsData, statsData]) => {
-        setComplaints(complaintsData);
-        setStats(statsData);
+        if (Array.isArray(complaintsData)) setComplaints(complaintsData);
+        if (statsData && typeof statsData === 'object') setStats(statsData);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('Failed to load analytics:', err);
+        console.warn('Analytics loading paused:', err.message);
         setLoading(false);
       });
   }, []);
@@ -314,9 +314,10 @@ export default function AnalyticsDashboard() {
         }
         .analytics-kpi-grid {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(4, minmax(0, 1fr));
           gap: 1.25rem;
           margin-bottom: 2rem;
+          width: 100%;
         }
         .kpi-card {
           padding: 1.25rem;
@@ -345,8 +346,9 @@ export default function AnalyticsDashboard() {
         }
         .charts-grid {
           display: grid;
-          grid-template-columns: repeat(2, 1fr);
+          grid-template-columns: repeat(2, minmax(0, 1fr));
           gap: 1.5rem;
+          width: 100%;
         }
         .chart-card {
           padding: 1.5rem;
@@ -512,6 +514,16 @@ export default function AnalyticsDashboard() {
           }
           .pipeline-arrow {
             display: none;
+          }
+        }
+        @media (max-width: 480px) {
+          .dept-row-item {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.35rem;
+          }
+          .dept-name-box {
+            width: 100%;
           }
         }
       `}</style>

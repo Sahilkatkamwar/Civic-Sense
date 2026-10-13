@@ -1,0 +1,258 @@
+/* client/src/modules/chat/chat.css */
+/* Scoped styles for Civic Assistant Floating Chat Widget */
+
+.cs-chat-launcher {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gov-navy, #0b2545);
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(11, 37, 69, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 9998;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease;
+}
+
+.cs-chat-launcher:hover {
+  background: var(--gov-navy-light, #133b6b);
+  transform: scale(1.06);
+}
+
+.cs-chat-launcher:focus-visible {
+  outline: 3px solid var(--gov-gold, #b45309);
+  outline-offset: 2px;
+}
+
+.cs-chat-panel {
+  position: fixed;
+  bottom: 84px;
+  right: 20px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  height: 540px;
+  max-height: calc(100vh - 110px);
+  background: #ffffff;
+  border: 1px solid var(--border, #ccd4df);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgba(11, 37, 69, 0.22);
+  display: flex;
+  flex-direction: column;
+  z-index: 9999;
+  overflow: hidden;
+  animation: csChatSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes csChatSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 480px) {
+  .cs-chat-panel {
+    bottom: 0;
+    right: 0;
+    left: 0;
+    width: 100%;
+    height: 82vh;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+  }
+}
+
+.cs-chat-header {
+  background: var(--gov-navy, #0b2545);
+  color: #ffffff;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cs-chat-header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.cs-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.cs-chat-icon-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  opacity: 0.85;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.cs-chat-icon-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.cs-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg-page, #f0f2f5);
+}
+
+.cs-chat-bubble {
+  max-width: 82%;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.cs-chat-bubble-assistant {
+  align-self: flex-start;
+  background: #ffffff;
+  color: var(--text-main, #0c1a30);
+  border: 1px solid var(--border-subtle, #e2e7ef);
+  border-bottom-left-radius: 2px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.cs-chat-bubble-user {
+  align-self: flex-end;
+  background: var(--gov-navy, #0b2545);
+  color: #ffffff;
+  border-bottom-right-radius: 2px;
+}
+
+.cs-chat-chips-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.cs-chat-chip {
+  align-self: flex-start;
+  background: #ffffff;
+  color: var(--gov-navy, #0b2545);
+  border: 1px solid var(--border, #ccd4df);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.775rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.cs-chat-chip:hover {
+  background: var(--primary-light, #eef3f9);
+  border-color: var(--gov-navy, #0b2545);
+}
+
+.cs-chat-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle, #e2e7ef);
+  align-self: flex-start;
+}
+
+.cs-chat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted, #52637a);
+  animation: csChatBlink 1.4s infinite ease-in-out both;
+}
+
+.cs-chat-dot:nth-child(1) { animation-delay: -0.32s; }
+.cs-chat-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes csChatBlink {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+.cs-chat-input-area {
+  padding: 0.75rem 0.85rem;
+  background: #ffffff;
+  border-top: 1px solid var(--border, #ccd4df);
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.cs-chat-textarea {
+  flex: 1;
+  border: 1px solid var(--border, #ccd4df);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text-main, #0c1a30);
+  background: var(--bg-page, #f0f2f5);
+  resize: none;
+  max-height: 80px;
+  outline: none;
+  line-height: 1.35;
+}
+
+.cs-chat-textarea:focus {
+  border-color: var(--gov-navy, #0b2545);
+  background: #ffffff;
+}
+
+.cs-chat-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--gov-navy, #0b2545);
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.cs-chat-send-btn:hover:not(:disabled) {
+  background: var(--gov-navy-light, #133b6b);
+}
+
+.cs-chat-send-btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}

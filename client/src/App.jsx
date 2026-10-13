@@ -16,15 +16,22 @@ import ReportForm from './modules/report/ReportForm';
 import TrackComplaint from './modules/report/TrackComplaint';
 import NotFound from './pages/NotFound';
 
+// Advanced Features: Risk Radar, Civic Alerts & Civic Assistant
+import RiskRadarPage from './modules/radar/RiskRadarPage';
+import AlertsPage from './modules/alerts/AlertsPage';
+import OfficialLoginPage from './modules/alerts/OfficialLoginPage';
+import AlertsManagePage from './modules/alerts/AlertsManagePage';
+import ChatWidget from './modules/chat/ChatWidget';
+
 import './theme.css';
 
 export default function App() {
   return (
     <Router>
-      <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <div className="app-shell" style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100%', maxWidth: '100vw', overflowX: 'clip', position: 'relative' }}>
         <Navbar />
 
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%', maxWidth: '100vw', minWidth: 0 }}>
           <Routes>
             {/* Municipal Executive Overview */}
             <Route path="/" element={<Home />} />
@@ -50,12 +57,21 @@ export default function App() {
             <Route path="/track" element={<TrackComplaint />} />
             <Route path="/track/:complaintId" element={<TrackComplaint />} />
 
+            {/* Civic Risk Radar */}
+            <Route path="/authority/risk-radar" element={<RiskRadarPage />} />
+
+            {/* Civic Alerts */}
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/authority/login" element={<OfficialLoginPage />} />
+            <Route path="/authority/alerts" element={<AlertsManagePage />} />
+
             {/* 404 Fallback */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
 
         <Footer />
+        <ChatWidget />
       </div>
     </Router>
   );
