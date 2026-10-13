@@ -12,7 +12,8 @@
     "test:api": "node server/test_api.js",
     "test:db": "node server/test_db.js",
     "test:duplicate": "node server/test_duplicate.js",
-    "test:e2e": "node server/test_e2e_flow.js"
+    "test:e2e": "node server/test_e2e_flow.js",
+    "seed:radar-demo": "node server/db/seed-radar-demo.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

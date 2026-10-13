@@ -14,6 +14,8 @@ import {
   XCircle
 } from 'lucide-react';
 
+export const API_BASE = import.meta.env.VITE_API_URL || '';
+
 /**
  * Category Metadata Map with Lucide icons and Department classifications
  */

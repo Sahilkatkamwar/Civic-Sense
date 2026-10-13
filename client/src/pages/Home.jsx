@@ -20,7 +20,7 @@ import MiniMap from '../components/MiniMap';
 import { getPriorityConfig, getCategoryConfig } from '../utils/civicHelpers';
 import { faqs } from '../content/text';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function Home() {
   const [stats, setStats] = useState({
@@ -36,18 +36,20 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API_BASE}/api/complaints/stats`).then((r) => r.json()),
-      fetch(`${API_BASE}/api/categories`).then((r) => r.json()),
-      fetch(`${API_BASE}/api/complaints?sort=priority`).then((r) => r.json())
+      fetch(`${API_BASE}/api/complaints/stats`).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      fetch(`${API_BASE}/api/categories`).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+      fetch(`${API_BASE}/api/complaints?sort=priority`).then((r) => (r.ok ? r.json() : [])).catch(() => [])
     ])
       .then(([statsData, catData, complaintsData]) => {
-        setStats(statsData);
-        setCategories(catData);
-        setAllComplaints(complaintsData);
-        setTopComplaints(complaintsData.slice(0, 3));
+        if (statsData && typeof statsData === 'object') setStats(statsData);
+        if (Array.isArray(catData)) setCategories(catData);
+        if (Array.isArray(complaintsData)) {
+          setAllComplaints(complaintsData);
+          setTopComplaints(complaintsData.slice(0, 3));
+        }
       })
       .catch((err) => {
-        console.error('Failed to load overview data:', err);
+        console.warn('Overview data loading paused:', err.message);
       });
   }, []);
 
@@ -406,13 +408,15 @@ export default function Home() {
         }
         .hero-container {
           display: grid;
-          grid-template-columns: 1.15fr 0.85fr;
-          gap: 3rem;
+          grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+          gap: 2.5rem;
           align-items: center;
+          width: 100%;
         }
         .hero-content {
           display: flex;
           flex-direction: column;
+          min-width: 0;
         }
         .gov-hero-pill {
           display: inline-flex;
@@ -427,17 +431,19 @@ export default function Home() {
           font-weight: 800;
           color: var(--gov-navy);
           width: fit-content;
+          max-width: 100%;
           margin-bottom: 1.25rem;
           box-shadow: var(--shadow-xs);
           letter-spacing: 0.03em;
         }
         .hero-headline {
-          font-size: 2.5rem;
+          font-size: clamp(1.85rem, 3.2vw, 2.5rem);
           font-weight: 800;
           line-height: 1.2;
           color: var(--gov-navy);
           font-family: var(--font-serif);
           margin-bottom: 0.4rem;
+          word-break: break-word;
         }
         .hero-hindi-sub {
           font-size: 1.1rem;
@@ -485,6 +491,10 @@ export default function Home() {
           border-radius: var(--radius-sm);
           padding: 1.25rem;
           box-shadow: var(--shadow-md);
+          min-width: 0;
+          max-width: 100%;
+          width: 100%;
+          box-sizing: border-box;
         }
         .hero-card-header {
           display: flex;
@@ -835,9 +845,24 @@ export default function Home() {
           line-height: 1.55;
         }
 
-        @media (max-width: 1024px) {
+        @media (max-width: 1200px) {
           .hero-container {
             grid-template-columns: 1fr;
+            gap: 2rem;
+          }
+          .hero-content {
+            max-width: 100%;
+          }
+        }
+
+        @media (max-width: 960px) {
+          .stats-strip-card {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+          }
+          .strip-divider {
+            display: none;
           }
           .sla-grid {
             grid-template-columns: repeat(2, 1fr);
@@ -854,13 +879,33 @@ export default function Home() {
         }
 
         @media (max-width: 640px) {
+          .hero-section {
+            padding: 2rem 0 2.5rem;
+          }
           .hero-headline {
-            font-size: 1.85rem;
+            font-size: 1.75rem;
+          }
+          .hero-actions {
+            flex-direction: column;
+            width: 100%;
+          }
+          .hero-actions .btn {
+            width: 100%;
+            justify-content: center;
+          }
+          .hero-card-footer {
+            flex-wrap: wrap;
+            gap: 0.75rem;
+          }
+          .hero-card-footer .btn {
+            width: 100%;
+            justify-content: center;
           }
           .stats-strip-card {
-            flex-direction: column;
-            gap: 1.5rem;
+            grid-template-columns: 1fr;
+            gap: 1.25rem;
             text-align: center;
+            padding: 1.25rem 1rem;
           }
           .strip-divider {
             display: none;

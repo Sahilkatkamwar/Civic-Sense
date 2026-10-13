@@ -23,7 +23,7 @@ import {
 } from '../../utils/civicHelpers';
 import IncidentDetailDrawer from './IncidentDetailDrawer';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export default function IncidentsTable() {
   const [complaints, setComplaints] = useState([]);
@@ -46,13 +46,13 @@ export default function IncidentsTable() {
         fetch(`${API_BASE}/api/complaints?sort=priority`),
         fetch(`${API_BASE}/api/categories`)
       ]);
-      const dataComplaints = await resComplaints.json();
-      const dataCategories = await resCategories.json();
+      const dataComplaints = resComplaints.ok ? await resComplaints.json() : [];
+      const dataCategories = resCategories.ok ? await resCategories.json() : [];
 
-      setComplaints(dataComplaints);
-      setCategories(dataCategories);
+      setComplaints(Array.isArray(dataComplaints) ? dataComplaints : []);
+      setCategories(Array.isArray(dataCategories) ? dataCategories : []);
     } catch (err) {
-      console.error('Failed to load incidents:', err);
+      console.warn('Failed to load incidents:', err.message);
     } finally {
       setLoading(false);
     }
@@ -551,7 +551,8 @@ export default function IncidentsTable() {
           justify-content: flex-end;
         }
         .table-drawer-panel {
-          width: 460px;
+          width: 480px;
+          max-width: 100vw;
           height: 100%;
           background: #ffffff;
           box-shadow: var(--shadow-xl);
@@ -560,6 +561,26 @@ export default function IncidentsTable() {
         @keyframes slideIn {
           from { transform: translateX(100%); }
           to { transform: translateX(0); }
+        }
+
+        @media (max-width: 768px) {
+          .incidents-filter-bar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+          }
+          .filter-controls {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+          }
+          .table-select {
+            width: 100%;
+          }
+          .search-box {
+            min-width: unset;
+            width: 100%;
+          }
         }
       `}</style>
     </div>

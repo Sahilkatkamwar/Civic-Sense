@@ -1,11 +1,12 @@
 // client/src/modules/report/AuthorityDashboard.jsx
 // Owner: Tanush (Authority Dashboard)
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Fix for default Leaflet marker icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -65,21 +66,22 @@ export default function AuthorityDashboard() {
   // Fetch categories for filter dropdown
   useEffect(() => {
     fetch(`${API_BASE}/api/categories`)
-      .then((res) => res.json())
-      .then((data) => setCategories(data))
-      .catch((err) => console.error('Error fetching categories:', err));
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setCategories(Array.isArray(data) ? data : []))
+      .catch((err) => console.warn('Categories loading paused:', err.message));
   }, []);
 
   const fetchQueue = (showLoading = true) => {
     if (showLoading) setLoading(true);
     fetch(`${API_BASE}/api/authority/complaints`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        setComplaints(data);
-        if (data.length > 0 && !selectedComplaint) {
-          selectComplaint(data[0]);
+        const list = Array.isArray(data) ? data : [];
+        setComplaints(list);
+        if (list.length > 0 && !selectedComplaint) {
+          selectComplaint(list[0]);
         } else if (selectedComplaint) {
-          const updated = data.find((c) => c.id === selectedComplaint.id);
+          const updated = list.find((c) => c.id === selectedComplaint.id);
           if (updated) selectComplaint(updated);
         }
         setLoading(false);
@@ -96,27 +98,28 @@ export default function AuthorityDashboard() {
     setMessage('');
 
     fetch(`${API_BASE}/api/complaints/${c.id}`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => setDetailData(data))
       .catch(() => setDetailData(null));
   };
 
   useEffect(() => {
     fetch(`${API_BASE}/api/authority/complaints`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
-        setComplaints(data);
-        if (data.length > 0) {
-          setSelectedComplaint(data[0]);
-          fetch(`${API_BASE}/api/complaints/${data[0].id}`)
-            .then((r) => r.json())
+        const list = Array.isArray(data) ? data : [];
+        setComplaints(list);
+        if (list.length > 0) {
+          setSelectedComplaint(list[0]);
+          fetch(`${API_BASE}/api/complaints/${list[0].id}`)
+            .then((r) => (r.ok ? r.json() : null))
             .then((d) => setDetailData(d))
             .catch(() => setDetailData(null));
         }
         setLoading(false);
       })
       .catch((err) => {
-        console.error('Error fetching authority queue:', err);
+        console.warn('Authority queue loading paused:', err.message);
         setLoading(false);
       });
   }, []);
@@ -180,6 +183,14 @@ export default function AuthorityDashboard() {
         <p className="page-subtitle">
           Centralized administrative command for municipal ward officers and field engineers. Review photographic evidence, assign field repair dispatches, and record statutory resolution audits.
         </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', marginTop: '1rem' }}>
+          <Link to="/authority/risk-radar" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>🎯 Open Risk Radar</span>
+          </Link>
+          <Link to="/authority/alerts" className="btn btn-outline" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>📢 Manage Alerts</span>
+          </Link>
+        </div>
       </div>
 
       {/* Quick Stats Bar */}
@@ -372,7 +383,7 @@ export default function AuthorityDashboard() {
                     <strong>Attached Photo Evidence:</strong>
                     <div style={{ marginTop: '0.5rem' }}>
                       <img
-                        src={`${API_BASE}${selectedComplaint.photo_path}`}
+                        src={selectedComplaint.photo_path.startsWith('http') ? selectedComplaint.photo_path : `${API_BASE}${selectedComplaint.photo_path.startsWith('/') ? '' : '/'}${selectedComplaint.photo_path}`}
                         alt="Evidence"
                         style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
@@ -531,8 +542,12 @@ export default function AuthorityDashboard() {
         }
         .auth-layout {
           display: grid;
-          grid-template-columns: 1fr 1.2fr;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
           gap: 1.5rem;
+          width: 100%;
+        }
+        .queue-pane, .detail-pane {
+          min-width: 0;
         }
         .queue-pane {
           max-height: 800px;
@@ -676,6 +691,40 @@ export default function AuthorityDashboard() {
         @media (max-width: 900px) {
           .auth-layout {
             grid-template-columns: 1fr;
+          }
+        }
+        @media (max-width: 640px) {
+          .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+          }
+          .stat-chip {
+            min-width: unset;
+            padding: 0.5rem;
+          }
+          .toolbar {
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.75rem;
+            padding: 0.75rem;
+          }
+          .toolbar-group {
+            flex-direction: column;
+            align-items: stretch;
+            width: 100%;
+          }
+          .field-row strong {
+            display: block;
+            width: 100%;
+            margin-bottom: 0.2rem;
+          }
+          .status-buttons {
+            flex-direction: column;
+          }
+          .status-buttons .btn {
+            width: 100%;
+            justify-content: center;
           }
         }
       `}</style>

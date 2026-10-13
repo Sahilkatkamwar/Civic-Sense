@@ -1,13 +1,30 @@
-// server/index.js
-// Owner: Sahil (Team Lead) - Server entry point and API route configuration
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 require('dotenv').config();
 const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const categoriesRouter = require('./routes/categories');
 const complaintsRouter = require('./routes/complaints');
+const riskRadarRouter = require('./routes/riskRadar');
+const authRouter = require('./routes/auth');
+const alertsRouter = require('./routes/alerts');
+const wardsRouter = require('./routes/wards');
+const chatRouter = require('./routes/chat');
+const { startAlertScheduler } = require('./services/alertScheduler');
+const { seedFeatures } = require('./db/seed-features');
 const db = require('./db/db');
+
+// Run Migration 002 (Civic Risk Radar, Alerts, Wards & Officials) on startup
+const migration002Path = path.join(__dirname, 'db/migrations/002_radar_alerts.sql');
+if (fs.existsSync(migration002Path)) {
+  const migration002 = fs.readFileSync(migration002Path, 'utf8');
+  db.exec(migration002);
+}
+seedFeatures(db);
+
+// Start Alert Lifecycle Scheduler
+startAlertScheduler(db);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +50,11 @@ app.get('/api/health', (req, res) => {
 // Mount API routes
 app.use('/api/categories', categoriesRouter);
 app.use('/api/complaints', complaintsRouter);
+app.use('/api/risk-radar', riskRadarRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/alerts', alertsRouter);
+app.use('/api/wards', wardsRouter);
+app.use('/api/chat', chatRouter);
 
 // API Contract specific route: GET /api/authority/complaints
 app.get('/api/authority/complaints', (req, res, next) => {

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import CategoryCard from './CategoryCard';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const CATEGORY_GROUPS = {
   pothole: 'Roads',
@@ -28,7 +28,9 @@ export default function IssueList() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
+  const fetchCategories = () => {
+    setLoading(true);
+    setLoadError(null);
     fetch(`${API_BASE}/api/categories`)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch categories');
@@ -39,9 +41,13 @@ export default function IssueList() {
         setLoading(false);
       })
       .catch((err) => {
-        setLoadError(err.message);
+        setLoadError(err.message || 'Unable to connect to municipal database');
         setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    fetchCategories();
   }, []);
 
   const groups = ['All', 'Roads', 'Sanitation', 'Electrical Safety', 'Parks & Environment', 'Public Health', 'General Civic'];
@@ -132,7 +138,10 @@ export default function IssueList() {
         <div className="card text-center" style={{ padding: '2.5rem 1rem' }}>
           <AlertTriangle size={32} className="text-red-500 mb-2 mx-auto" />
           <h3>Failed to load hazard directory</h3>
-          <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem' }}>{loadError}</p>
+          <p style={{ color: 'var(--text-muted)', marginTop: '0.4rem', marginBottom: '1rem' }}>{loadError}</p>
+          <button type="button" className="btn btn-primary btn-sm" onClick={fetchCategories}>
+            Retry Connection
+          </button>
         </div>
       ) : filteredCategories.length === 0 ? (
         <div className="card text-center" style={{ padding: '3.5rem 1rem' }}>

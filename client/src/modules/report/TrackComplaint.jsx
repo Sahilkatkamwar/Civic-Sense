@@ -21,7 +21,7 @@ import {
   formatFullDateTime
 } from '../../utils/civicHelpers';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -332,7 +332,7 @@ export default function TrackComplaint() {
               {complaint.photo_path && (
                 <div className="track-photo-container">
                   <img
-                    src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path}`}
+                    src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path.startsWith('/') ? '' : '/'}${complaint.photo_path}`}
                     alt="Geotagged Evidence"
                     className="track-photo-img"
                     onError={(e) => {
@@ -483,9 +483,13 @@ export default function TrackComplaint() {
         }
         .track-result-grid {
           display: grid;
-          grid-template-columns: 1fr 380px;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
           gap: 1.75rem;
           align-items: flex-start;
+          width: 100%;
+        }
+        .track-left-col, .track-right-col {
+          min-width: 0;
         }
         .track-left-col {
           display: flex;

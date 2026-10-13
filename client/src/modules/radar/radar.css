@@ -1,0 +1,479 @@
+/* client/src/modules/radar/radar.css */
+/* Scoped styles for Civic Risk Radar */
+
+.cs-radar-page {
+  padding: 1.5rem 1rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.cs-radar-header {
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.cs-radar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.cs-radar-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border-radius: var(--radius-sm, 4px);
+  letter-spacing: 0.5px;
+}
+
+.cs-radar-badge-critical {
+  background-color: var(--critical-bg, #fef2f2);
+  color: var(--critical-text, #991b1b);
+  border: 1px solid var(--critical-border, #fecaca);
+}
+
+.cs-radar-badge-high {
+  background-color: var(--high-bg, #fff7ed);
+  color: var(--high-text, #9a3412);
+  border: 1px solid var(--high-border, #fed7aa);
+}
+
+.cs-radar-badge-medium {
+  background-color: var(--medium-bg, #fffbeb);
+  color: var(--medium-text, #92400e);
+  border: 1px solid var(--medium-border, #fde68a);
+}
+
+.cs-radar-badge-low {
+  background-color: var(--low-bg, #f0fdf4);
+  color: var(--low-text, #166534);
+  border: 1px solid var(--low-border, #bbf7d0);
+}
+
+.cs-radar-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--gov-navy, #0b2545);
+  margin: 0 0 0.5rem 0;
+}
+
+.cs-radar-subtitle {
+  color: var(--text-muted, #52637a);
+  font-size: 0.95rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.cs-radar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--bg-surface, #ffffff);
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--border, #ccd4df);
+  box-shadow: var(--shadow-xs, 0 1px 2px rgba(0,0,0,0.05));
+  margin-bottom: 1.25rem;
+}
+
+.cs-radar-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+}
+
+.cs-radar-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #27374d);
+  font-weight: 600;
+}
+
+.cs-radar-select {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border, #ccd4df);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-surface, #ffffff);
+  font-size: 0.875rem;
+  color: var(--text-main, #0c1a30);
+}
+
+.cs-radar-stats {
+  font-size: 0.85rem;
+  color: var(--text-muted, #52637a);
+}
+
+.cs-radar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+  gap: 1.25rem;
+  min-height: 560px;
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 992px) {
+  .cs-radar-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cs-radar-map-card {
+  background: var(--bg-surface, #ffffff);
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--border, #ccd4df);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 520px;
+}
+
+.cs-radar-map-container {
+  width: 100%;
+  height: 100%;
+  min-height: 520px;
+  flex: 1;
+}
+
+.cs-radar-panel {
+  background: var(--bg-surface, #ffffff);
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--border, #ccd4df);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: 720px;
+}
+
+.cs-radar-cluster-header {
+  border-bottom: 1px solid var(--border-subtle, #e2e7ef);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cs-radar-score-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.cs-radar-score-box {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.cs-radar-score-num {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.cs-radar-score-max {
+  font-size: 0.95rem;
+  color: var(--text-muted, #52637a);
+  font-weight: 600;
+}
+
+.cs-radar-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--text-muted, #52637a);
+  margin-top: 0.5rem;
+}
+
+.cs-radar-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.cs-radar-section {
+  margin-bottom: 1.25rem;
+}
+
+.cs-radar-section-title {
+  font-size: 0.825rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted, #52637a);
+  letter-spacing: 0.5px;
+  margin-bottom: 0.6rem;
+}
+
+.cs-radar-factors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.cs-radar-factor-row {
+  font-size: 0.85rem;
+}
+
+.cs-radar-factor-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  font-weight: 600;
+  color: var(--text-secondary, #27374d);
+}
+
+.cs-radar-factor-bar-bg {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-subtle, #e6e9ee);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.cs-radar-factor-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background-color: var(--gov-navy, #0b2545);
+  transition: width 0.3s ease;
+}
+
+.cs-radar-factor-exp {
+  font-size: 0.775rem;
+  color: var(--text-muted, #52637a);
+  line-height: 1.35;
+}
+
+.cs-radar-rec-box {
+  background-color: var(--primary-light, #eef3f9);
+  border-left: 4px solid var(--gov-navy, #0b2545);
+  padding: 0.85rem;
+  border-radius: 0 var(--radius-sm, 4px) var(--radius-sm, 4px) 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text-main, #0c1a30);
+}
+
+.cs-radar-inspect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: var(--gov-navy, #0b2545);
+  color: #ffffff;
+  border-radius: var(--radius-sm, 4px);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: background 0.15s ease;
+  margin-top: 0.5rem;
+}
+
+.cs-radar-inspect-btn:hover {
+  background: var(--gov-navy-light, #133b6b);
+  color: #ffffff;
+}
+
+.cs-radar-members-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.cs-radar-member-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-subtle, #e2e7ef);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg-page, #f0f2f5);
+  font-size: 0.8rem;
+  align-items: center;
+}
+
+.cs-radar-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-xs, 2px);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #cbd5e1;
+}
+
+.cs-radar-member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.cs-radar-member-id {
+  font-weight: 700;
+  color: var(--gov-navy, #0b2545);
+}
+
+.cs-radar-member-desc {
+  color: var(--text-muted, #52637a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cs-radar-collapsible {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border, #ccd4df);
+  border-radius: var(--radius-md, 6px);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.cs-radar-collapsible-summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--gov-navy, #0b2545);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+
+.cs-radar-collapsible-content {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #27374d);
+  line-height: 1.6;
+}
+
+.cs-radar-formula-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  font-size: 0.825rem;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cs-radar-formula-table th,
+.cs-radar-formula-table td {
+  border: 1px solid var(--border-subtle, #e2e7ef);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+.cs-radar-formula-table th {
+  background: var(--bg-subtle, #e6e9ee);
+  font-weight: 700;
+}
+
+.cs-radar-disclaimer {
+  text-align: center;
+  font-size: 0.825rem;
+  color: var(--text-muted, #52637a);
+  padding: 1rem;
+  background: var(--bg-subtle, #e6e9ee);
+  border-radius: var(--radius-sm, 4px);
+  border-left: 3px solid var(--gov-gold, #b45309);
+  margin-top: 1rem;
+}
+
+.cs-radar-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-muted, #52637a);
+}
+
+.cs-radar-empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.cs-radar-loading,
+.cs-radar-error {
+  padding: 4rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary, #27374d);
+}
+
+.cs-radar-custom-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 2px 6px;
+}
+
+@media (max-width: 992px) {
+  .cs-radar-layout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+  .cs-radar-map-card,
+  .cs-radar-map-container {
+    min-height: 420px;
+  }
+  .cs-radar-panel {
+    max-height: unset;
+  }
+}
+
+@media (max-width: 640px) {
+  .cs-radar-page {
+    padding: 1rem 0.5rem;
+  }
+  .cs-radar-title {
+    font-size: 1.35rem;
+  }
+  .cs-radar-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+  .cs-radar-filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .cs-radar-filter-item {
+    justify-content: space-between;
+    width: 100%;
+  }
+  .cs-radar-select {
+    flex: 1;
+    max-width: 65%;
+  }
+  .cs-radar-map-card,
+  .cs-radar-map-container {
+    min-height: 330px;
+  }
+  .cs-radar-score-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
