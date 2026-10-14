@@ -21,15 +21,24 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
+    let ext = path.extname(file.originalname);
+    if (!ext) {
+      if (file.mimetype === 'video/mp4') ext = '.mp4';
+      else if (file.mimetype === 'video/webm') ext = '.webm';
+      else if (file.mimetype === 'image/png') ext = '.png';
+      else if (file.mimetype === 'image/webp') ext = '.webp';
+      else if (file.mimetype.startsWith('video/')) ext = '.webm';
+      else ext = '.jpg';
+    }
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, 'photo-' + uniqueSuffix + ext);
+    const prefix = (file.mimetype && file.mimetype.startsWith('video/')) ? 'video-' : 'photo-';
+    cb(null, prefix + uniqueSuffix + ext);
   }
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 30 * 1024 * 1024 } // 30MB limit to support photo & video clips
 });
 
 /**
@@ -179,10 +188,21 @@ router.get('/:id', (req, res) => {
     // Get allowed next statuses for the current state
     const allowedTransitions = getAllowedTransitions(complaint.status);
 
+    let userVerification = null;
+    let userEndorsed = false;
+    if (req.query.clientId) {
+      const v = db.prepare('SELECT action FROM complaint_verifications WHERE complaint_id = ? AND client_id = ?').get(req.params.id, req.query.clientId);
+      if (v) userVerification = v.action;
+      const e = db.prepare('SELECT 1 FROM complaint_endorsements WHERE complaint_id = ? AND client_id = ?').get(req.params.id, req.query.clientId);
+      if (e) userEndorsed = true;
+    }
+
     res.json({
       ...complaint,
       status_history: history,
-      allowed_transitions: allowedTransitions
+      allowed_transitions: allowedTransitions,
+      user_verification: userVerification,
+      user_endorsed: userEndorsed
     });
   } catch (err) {
     console.error('Error tracking complaint:', err);
@@ -216,7 +236,12 @@ router.post('/', upload.single('photo'), async (req, res) => {
 
     if (req.file) {
       photoPath = `/uploads/${req.file.filename}`;
-      photoHash = await computeHash(req.file.path);
+      const isImage = !req.file.mimetype || req.file.mimetype.startsWith('image/');
+      if (isImage) {
+        photoHash = await computeHash(req.file.path);
+      } else {
+        photoHash = null;
+      }
     }
 
     // Check category exists
@@ -359,10 +384,10 @@ router.post('/', upload.single('photo'), async (req, res) => {
   }
 });
 
-// PATCH /api/complaints/:id/status - Authority updates status
-router.patch('/:id/status', (req, res) => {
+// PATCH /api/complaints/:id/status - Authority updates status (supports resolution proof photo)
+router.patch('/:id/status', upload.single('resolution_photo'), (req, res) => {
   try {
-    const { status: newStatus, note } = req.body;
+    const { status: newStatus, note, resolution_photo_path } = req.body;
     if (!newStatus) {
       return res.status(400).json({ error: 'New status is required' });
     }
@@ -380,13 +405,40 @@ router.patch('/:id/status', (req, res) => {
       });
     }
 
-    db.prepare(`
-      UPDATE complaints
-      SET status = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(newStatus, req.params.id);
+    // MANDATORY PROOF OF RESOLUTION: If transitioning to 'resolved', an After Photo is required
+    let finalResolutionPhoto = complaint.resolution_photo_path || null;
+    if (req.file) {
+      finalResolutionPhoto = `/uploads/${req.file.filename}`;
+    } else if (resolution_photo_path) {
+      finalResolutionPhoto = resolution_photo_path;
+    }
 
-    const historyNote = note || `Status updated from ${complaint.status} to ${newStatus}`;
+    if (newStatus === 'resolved' && !finalResolutionPhoto) {
+      return res.status(400).json({
+        error: 'Proof of Resolution photo is required before marking a ticket as Resolved. Please upload photographic evidence of the completed repair.'
+      });
+    }
+
+    const resolutionNote = note || (newStatus === 'resolved' ? 'Official field repair completed and verified by municipal unit.' : null);
+
+    if (newStatus === 'resolved') {
+      db.prepare(`
+        UPDATE complaints
+        SET status = ?, resolution_photo_path = ?, resolution_note = ?, resolved_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newStatus, finalResolutionPhoto, resolutionNote, req.params.id);
+    } else {
+      db.prepare(`
+        UPDATE complaints
+        SET status = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newStatus, req.params.id);
+    }
+
+    const historyNote = newStatus === 'resolved'
+      ? `✅ RESOLVED: Proof of resolution uploaded. ${resolutionNote}. Citizen verification window is now open.`
+      : (note || `Status updated from ${complaint.status} to ${newStatus}`);
+
     db.prepare(`
       INSERT INTO status_history (complaint_id, status, note)
       VALUES (?, ?, ?)
@@ -396,18 +448,164 @@ router.patch('/:id/status', (req, res) => {
       id: req.params.id,
       status: newStatus,
       previous_status: complaint.status,
+      resolution_photo_path: finalResolutionPhoto,
+      resolution_note: resolutionNote,
       allowed_transitions: getAllowedTransitions(newStatus),
-      message: `Status updated to ${newStatus}`
+      message: newStatus === 'resolved'
+        ? 'Ticket marked Resolved with verified Proof of Resolution photo.'
+        : `Status updated to ${newStatus}`
     });
   } catch (err) {
     console.error('Error updating status:', err);
-    res.status(500).json({ error: 'Failed to update complaint status' });
+    res.status(500).json({ error: 'Failed to update complaint status: ' + err.message });
   }
 });
 
-// POST /api/complaints/:id/support - "I face this too" button (Bonus feature)
-router.post('/:id/support', (req, res) => {
+// POST /api/complaints/:id/verify - Citizen Verification ("Confirm Fixed" or "Dispute / Still Broken")
+router.post('/:id/verify', (req, res) => {
   try {
+    const { action, note, clientId } = req.body;
+    if (!action || !['confirm', 'dispute'].includes(action)) {
+      return res.status(400).json({ error: "Action must be either 'confirm' or 'dispute'" });
+    }
+
+    const complaint = db.prepare('SELECT * FROM complaints WHERE id = ?').get(req.params.id);
+    if (!complaint) {
+      return res.status(404).json({ error: `Complaint '${req.params.id}' not found` });
+    }
+
+    // Check if client has already verified this ticket
+    if (clientId) {
+      const existing = db.prepare(`
+        SELECT action FROM complaint_verifications
+        WHERE complaint_id = ? AND client_id = ?
+      `).get(req.params.id, clientId);
+
+      if (existing) {
+        return res.status(400).json({
+          error: `You have already recorded your verification (${existing.action === 'confirm' ? 'Confirmed Fixed' : 'Disputed'}) for this complaint.`
+        });
+      }
+    }
+
+    if (action === 'confirm') {
+      const newConfirmCount = (complaint.confirm_count || 0) + 1;
+      db.prepare(`
+        UPDATE complaints
+        SET confirm_count = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(newConfirmCount, req.params.id);
+
+      if (clientId) {
+        db.prepare(`
+          INSERT OR REPLACE INTO complaint_verifications (complaint_id, client_id, action, note)
+          VALUES (?, ?, 'confirm', ?)
+        `).run(req.params.id, clientId, note || 'Citizen confirmed fixed');
+      }
+
+      db.prepare(`
+        INSERT INTO status_history (complaint_id, status, note)
+        VALUES (?, ?, ?)
+      `).run(
+        req.params.id,
+        complaint.status,
+        `✅ Citizen Audit: Local resident verified and confirmed repair work (Total confirmations: ${newConfirmCount}).`
+      );
+
+      return res.json({
+        success: true,
+        action: 'confirm',
+        confirm_count: newConfirmCount,
+        dispute_count: complaint.dispute_count || 0,
+        message: 'Thank you! Your confirmation has been officially recorded in the civic audit trail.'
+      });
+    }
+
+    if (action === 'dispute') {
+      const newDisputeCount = (complaint.dispute_count || 0) + 1;
+
+      if (clientId) {
+        db.prepare(`
+          INSERT OR REPLACE INTO complaint_verifications (complaint_id, client_id, action, note)
+          VALUES (?, ?, 'dispute', ?)
+        `).run(req.params.id, clientId, note || 'Citizen disputed resolution');
+      }
+
+      // THE 3-DISPUTE AUTO-REOPEN TRIGGER:
+      // If 3 citizens dispute the resolution, automatically re-open the ticket with higher priority!
+      if (newDisputeCount >= 3 && complaint.status === 'resolved') {
+        const boostedScore = Math.min(100, (complaint.priority_score || 40) + 25);
+        let boostedLevel = 'critical';
+        if (boostedScore < 40) boostedLevel = 'medium';
+        else if (boostedScore < 70) boostedLevel = 'high';
+
+        db.prepare(`
+          UPDATE complaints
+          SET status = 'under_review',
+              dispute_count = ?,
+              dispute_reopened = 1,
+              priority_score = ?,
+              priority_level = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(newDisputeCount, boostedScore, boostedLevel, req.params.id);
+
+        db.prepare(`
+          INSERT INTO status_history (complaint_id, status, note)
+          VALUES (?, 'under_review', ?)
+        `).run(
+          req.params.id,
+          `⚠️ AUTO-REOPENED BY CITIZEN CONSENSUS: 3 residents reported this issue is STILL BROKEN despite resolution. Ticket automatically reopened and escalated to ${boostedLevel.toUpperCase()} priority (Score: ${boostedScore}).`
+        );
+
+        return res.json({
+          success: true,
+          action: 'dispute',
+          reopened: true,
+          new_status: 'under_review',
+          confirm_count: complaint.confirm_count || 0,
+          dispute_count: newDisputeCount,
+          priority_score: boostedScore,
+          priority_level: boostedLevel,
+          message: `⚠️ 3 citizens disputed resolution! The complaint has been automatically reopened and escalated to ${boostedLevel.toUpperCase()} priority for emergency reinspection.`
+        });
+      } else {
+        db.prepare(`
+          UPDATE complaints
+          SET dispute_count = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(newDisputeCount, req.params.id);
+
+        db.prepare(`
+          INSERT INTO status_history (complaint_id, status, note)
+          VALUES (?, ?, ?)
+        `).run(
+          req.params.id,
+          complaint.status,
+          `⚠️ Citizen Dispute: A resident reported this issue is still broken (${newDisputeCount}/3 disputes to auto-reopen).`
+        );
+
+        return res.json({
+          success: true,
+          action: 'dispute',
+          reopened: false,
+          confirm_count: complaint.confirm_count || 0,
+          dispute_count: newDisputeCount,
+          message: `Dispute logged (${newDisputeCount}/3 disputes required to automatically reopen this ticket).`
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Error verifying complaint:', err);
+    res.status(500).json({ error: 'Failed to record verification: ' + err.message });
+  }
+});
+
+// POST /api/complaints/:id/support - "Impacts Me Too (+1)" / Community Endorsement
+router.post(['/:id/support', '/:id/endorse'], (req, res) => {
+  try {
+    const { clientId } = req.body || {};
+
     const complaint = db.prepare(`
       SELECT c.*, cat.severity_weight
       FROM complaints c
@@ -420,12 +618,38 @@ router.post('/:id/support', (req, res) => {
     }
 
     if (complaint.status === 'resolved' || complaint.status === 'rejected') {
-      return res.status(400).json({ error: 'Cannot support a resolved or rejected complaint' });
+      return res.status(400).json({ error: 'Cannot endorse an already resolved or rejected complaint' });
     }
 
-    const newCount = complaint.report_count + 1;
+    // Check if client already endorsed
+    if (clientId) {
+      const already = db.prepare(`
+        SELECT 1 FROM complaint_endorsements
+        WHERE complaint_id = ? AND client_id = ?
+      `).get(req.params.id, clientId);
+
+      if (already) {
+        return res.json({
+          already_endorsed: true,
+          report_count: complaint.report_count,
+          endorsement_count: complaint.endorsement_count || 0,
+          priority_score: complaint.priority_score,
+          priority_level: complaint.priority_level,
+          message: 'You have already endorsed this issue (+1).'
+        });
+      }
+
+      db.prepare(`
+        INSERT OR IGNORE INTO complaint_endorsements (complaint_id, client_id)
+        VALUES (?, ?)
+      `).run(req.params.id, clientId);
+    }
+
+    const newEndorsementCount = (complaint.endorsement_count || 0) + 1;
+    const newReportCount = (complaint.report_count || 1) + 1;
+
     const { score, level } = calculatePriority({
-      report_count: newCount,
+      report_count: newReportCount,
       severity_weight: complaint.severity_weight,
       created_at: complaint.created_at,
       authenticity: complaint.authenticity
@@ -433,9 +657,9 @@ router.post('/:id/support', (req, res) => {
 
     db.prepare(`
       UPDATE complaints
-      SET report_count = ?, priority_score = ?, priority_level = ?, updated_at = CURRENT_TIMESTAMP
+      SET report_count = ?, endorsement_count = ?, priority_score = ?, priority_level = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `).run(newCount, score, level, req.params.id);
+    `).run(newReportCount, newEndorsementCount, score, level, req.params.id);
 
     db.prepare(`
       INSERT INTO status_history (complaint_id, status, note)
@@ -443,20 +667,23 @@ router.post('/:id/support', (req, res) => {
     `).run(
       req.params.id,
       complaint.status,
-      `A citizen confirmed this issue (Total supporters: ${newCount}). Priority updated to ${level}.`
+      `⚡ Community Endorsement: A local resident endorsed "Impacts Me Too" (Total affected: ${newReportCount}). Priority score updated to ${score} (${level}).`
     );
 
     res.json({
       id: req.params.id,
-      report_count: newCount,
+      report_count: newReportCount,
+      endorsement_count: newEndorsementCount,
       priority_score: score,
       priority_level: level,
-      message: `Thank you! ${newCount} citizens have now reported this issue.`
+      already_endorsed: false,
+      message: `Thank you! ${newReportCount} local residents are now confirmed affected by this hazard.`
     });
   } catch (err) {
-    console.error('Error supporting complaint:', err);
-    res.status(500).json({ error: 'Failed to add support to complaint' });
+    console.error('Error endorsing complaint:', err);
+    res.status(500).json({ error: 'Failed to record endorsement: ' + err.message });
   }
 });
 
 module.exports = router;
+

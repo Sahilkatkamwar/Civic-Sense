@@ -12,7 +12,11 @@ import {
   MapPin,
   ThumbsUp,
   Camera,
-  History
+  Video,
+  History,
+  ShieldCheck,
+  AlertTriangle,
+  Check
 } from 'lucide-react';
 import {
   getCategoryConfig,
@@ -20,8 +24,19 @@ import {
   getStatusConfig,
   formatFullDateTime
 } from '../../utils/civicHelpers';
+import BeforeAfterSlider from './BeforeAfterSlider';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
+
+// Helper to get or generate anonymous client ID
+function getClientId() {
+  let id = localStorage.getItem('cs_client_id');
+  if (!id) {
+    id = 'client_' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36);
+    localStorage.setItem('cs_client_id', id);
+  }
+  return id;
+}
 
 // Fix Leaflet icons
 delete L.Icon.Default.prototype._getIconUrl;
@@ -48,16 +63,24 @@ export default function TrackComplaint() {
   const [error, setError] = useState(null);
   const [supporting, setSupporting] = useState(false);
   const [supportMsg, setSupportMsg] = useState('');
+  const [hasEndorsed, setHasEndorsed] = useState(false);
 
-  const sampleIds = ['CS-2026-00001', 'CS-2026-00002', 'CS-2026-00003'];
+  // Citizen Verification State
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState('');
+  const [userVote, setUserVote] = useState(null); // 'confirm' | 'dispute' | null
+
+  const sampleIds = ['CS-2026-00001', 'CS-2026-00002', 'CS-2026-00003', 'CS-2026-00004'];
 
   const fetchComplaint = (id) => {
     if (!id || !id.trim()) return;
     setLoading(true);
     setError(null);
     setSupportMsg('');
+    setVerifyMsg('');
 
-    fetch(`${API_BASE}/api/complaints/${id.trim()}`)
+    const clientId = getClientId();
+    fetch(`${API_BASE}/api/complaints/${id.trim()}?clientId=${clientId}`)
       .then((res) => {
         if (!res.ok) {
           if (res.status === 404) {
@@ -69,6 +92,20 @@ export default function TrackComplaint() {
       })
       .then((data) => {
         setComplaint(data);
+        if (data.user_verification) {
+          setUserVote(data.user_verification);
+        } else {
+          const localVote = localStorage.getItem('cs_vote_' + data.id);
+          if (localVote) setUserVote(localVote);
+        }
+
+        if (data.user_endorsed) {
+          setHasEndorsed(true);
+        } else {
+          const localEndorsed = localStorage.getItem('cs_endorsed_' + data.id);
+          if (localEndorsed) setHasEndorsed(true);
+        }
+
         setLoading(false);
       })
       .catch((err) => {
@@ -93,24 +130,57 @@ export default function TrackComplaint() {
   };
 
   const handleSupport = async () => {
-    if (!complaint) return;
+    if (!complaint || supporting) return;
     setSupporting(true);
     setSupportMsg('');
 
     try {
+      const clientId = getClientId();
       const res = await fetch(`${API_BASE}/api/complaints/${complaint.id}/support`, {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId })
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to add confirmation');
       }
-      setSupportMsg(data.message || 'Thank you! Your confirmation has been counted.');
+      setHasEndorsed(true);
+      localStorage.setItem('cs_endorsed_' + complaint.id, 'true');
+      setSupportMsg(data.message || 'Thank you! Your endorsement has been counted.');
       fetchComplaint(complaint.id);
     } catch (err) {
       setSupportMsg(`Error: ${err.message}`);
     } finally {
       setSupporting(false);
+    }
+  };
+
+  const handleVerify = async (action) => {
+    if (!complaint || verifying) return;
+    setVerifying(true);
+    setVerifyMsg('');
+
+    try {
+      const clientId = getClientId();
+      const res = await fetch(`${API_BASE}/api/complaints/${complaint.id}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, clientId })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to record verification');
+      }
+
+      setUserVote(action);
+      localStorage.setItem('cs_vote_' + complaint.id, action);
+      setVerifyMsg(data.message);
+      fetchComplaint(complaint.id);
+    } catch (err) {
+      setVerifyMsg(`❌ ${err.message}`);
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -266,6 +336,93 @@ export default function TrackComplaint() {
               </div>
             </div>
 
+            {/* Proof of Resolution & Citizen Verification Card */}
+            {(complaint.resolution_photo_path || complaint.status === 'resolved') && (
+              <div className="card proof-card" style={{ marginBottom: '1.5rem', border: '1px solid #10b981' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck size={20} className="text-emerald-600" />
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#065f46' }}>
+                      Proof of Resolution & Citizen Audit (नागरिक सत्यापन)
+                    </h3>
+                  </div>
+                  <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
+                    STATUTORY REPAIR AUDIT
+                  </span>
+                </div>
+
+                {complaint.dispute_reopened === 1 && (
+                  <div style={{ padding: '0.75rem 1rem', background: '#fef2f2', border: '1px solid #f87171', borderRadius: '8px', marginBottom: '1rem', color: '#991b1b', fontSize: '0.85rem' }}>
+                    <strong>⚠️ TICKET REOPENED BY CITIZEN CONSENSUS:</strong> 3 residents disputed the official repair proof. The complaint has been automatically reopened and escalated to <strong>{prioConfig.label.toUpperCase()}</strong> priority for field reinspection.
+                  </div>
+                )}
+
+                {/* Interactive Before & After Slider */}
+                <BeforeAfterSlider
+                  beforeImg={complaint.photo_path ? (complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path.startsWith('/') ? '' : '/'}${complaint.photo_path}`) : '/uploads/sample-pothole.jpg'}
+                  afterImg={complaint.resolution_photo_path ? (complaint.resolution_photo_path.startsWith('http') ? complaint.resolution_photo_path : `${API_BASE}${complaint.resolution_photo_path.startsWith('/') ? '' : '/'}${complaint.resolution_photo_path}`) : '/uploads/sample-resolved-pothole.jpg'}
+                  resolvedAt={complaint.resolved_at}
+                  resolutionNote={complaint.resolution_note}
+                  categoryName={complaint.category_name}
+                />
+
+                {/* Citizen Verification Action Panel */}
+                <div className="citizen-verification-box" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#0f172a' }}>
+                        Are you near this site? Verify the repair work
+                      </h4>
+                      <p style={{ margin: '0.2rem 0 0', fontSize: '0.78rem', color: '#475569' }}>
+                        Democratic civic audit: If 3 local citizens dispute, the complaint automatically reopens with elevated priority.
+                      </p>
+                    </div>
+
+                    {/* Live Counters */}
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#059669', background: '#d1fae5', border: '1px solid #6ee7b7', padding: '3px 8px', borderRadius: '4px' }}>
+                        ✅ {complaint.confirm_count || 0} Confirmed Fixed
+                      </span>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, color: (complaint.dispute_count > 0 ? '#b91c1c' : '#64748b'), background: (complaint.dispute_count > 0 ? '#fee2e2' : '#f1f5f9'), border: '1px solid ' + (complaint.dispute_count > 0 ? '#fca5a5' : '#e2e8f0'), padding: '3px 8px', borderRadius: '4px' }}>
+                        ⚠️ {complaint.dispute_count || 0}/3 Disputed
+                      </span>
+                    </div>
+                  </div>
+
+                  {verifyMsg && (
+                    <div style={{ padding: '0.6rem 0.85rem', borderRadius: '6px', fontSize: '0.82rem', margin: '0.75rem 0', background: verifyMsg.startsWith('❌') ? '#fef2f2' : '#ecfdf5', color: verifyMsg.startsWith('❌') ? '#991b1b' : '#065f46', border: '1px solid ' + (verifyMsg.startsWith('❌') ? '#fca5a5' : '#a7f3d0') }}>
+                      {verifyMsg}
+                    </div>
+                  )}
+
+                  {/* Verification Action Buttons */}
+                  <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ background: userVote === 'confirm' ? '#059669' : '#10b981', color: '#ffffff', borderColor: '#059669', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                      onClick={() => handleVerify('confirm')}
+                      disabled={verifying || userVote !== null}
+                    >
+                      {userVote === 'confirm' ? <Check size={15} /> : <CheckCircle2 size={15} />}
+                      {userVote === 'confirm' ? '✓ You Confirmed Fixed' : '✅ Confirm Fixed'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      style={{ background: userVote === 'dispute' ? '#b91c1c' : '#ef4444', color: '#ffffff', borderColor: '#b91c1c', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 700 }}
+                      onClick={() => handleVerify('dispute')}
+                      disabled={verifying || userVote !== null}
+                    >
+                      <AlertTriangle size={15} />
+                      {userVote === 'dispute' ? '⚠️ You Disputed Repair' : '⚠️ Dispute / Still Broken'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Audit History Timeline Card */}
             <div className="card audit-card">
               <div className="audit-header">
@@ -331,37 +488,70 @@ export default function TrackComplaint() {
 
               {complaint.photo_path && (
                 <div className="track-photo-container">
-                  <img
-                    src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path.startsWith('/') ? '' : '/'}${complaint.photo_path}`}
-                    alt="Geotagged Evidence"
-                    className="track-photo-img"
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
+                  {/\.(webm|mp4|mov|ogg)$/i.test(complaint.photo_path) || complaint.photo_path.includes('video-') ? (
+                    <video
+                      src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path.startsWith('/') ? '' : '/'}${complaint.photo_path}`}
+                      controls
+                      playsInline
+                      className="track-photo-img"
+                      style={{ maxHeight: '380px', objectFit: 'contain', background: '#000000', width: '100%' }}
+                    />
+                  ) : (
+                    <img
+                      src={complaint.photo_path.startsWith('http') ? complaint.photo_path : `${API_BASE}${complaint.photo_path.startsWith('/') ? '' : '/'}${complaint.photo_path}`}
+                      alt="Geotagged Evidence"
+                      className="track-photo-img"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  )}
                   <div className="photo-caption-bar">
-                    <Camera size={12} />
-                    <span>Geotagged Perceptual Hash Evidence</span>
+                    {/\.(webm|mp4|mov|ogg)$/i.test(complaint.photo_path) || complaint.photo_path.includes('video-') ? (
+                      <>
+                        <Video size={12} />
+                        <span>Geotagged Field Video Recording Evidence</span>
+                      </>
+                    ) : (
+                      <>
+                        <Camera size={12} />
+                        <span>Geotagged Perceptual Hash Evidence</span>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Citizen Endorsement */}
+              {/* Citizen Community Endorsement ("Impacts Me Too") */}
               <div className="support-endorse-box">
-                <div>
-                  <div className="support-box-title">Citizen Consensus</div>
+                <div style={{ flex: 1 }}>
+                  <div className="support-box-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <span>⚡ Community Endorsement</span>
+                    <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fcd34d', padding: '2px 8px', borderRadius: '999px', letterSpacing: '0.02em' }}>
+                      🔥 {complaint.report_count || 1} local residents affected
+                    </span>
+                  </div>
                   <div className="support-box-sub">
-                    <strong>{complaint.report_count || 1}</strong> citizens have reported this hazard.
+                    {hasEndorsed ? (
+                      <span style={{ color: '#059669', fontWeight: 600 }}>
+                        ✓ You and {(complaint.report_count || 1) - 1} other local residents have endorsed this issue.
+                      </span>
+                    ) : (
+                      <span>
+                        Impacted by this hazard? One-click endorsement directly boosts municipal priority without re-submitting.
+                      </span>
+                    )}
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="btn btn-secondary btn-sm"
+                  className={`btn btn-sm ${hasEndorsed ? 'btn-outline' : 'btn-primary'}`}
                   onClick={handleSupport}
-                  disabled={supporting || complaint.status === 'resolved'}
+                  disabled={supporting || hasEndorsed || complaint.status === 'resolved'}
+                  style={hasEndorsed ? { borderColor: '#10b981', color: '#059669', background: '#ecfdf5', fontWeight: 700 } : { fontWeight: 700 }}
                 >
                   <ThumbsUp size={14} />
-                  {supporting ? 'Verifying...' : 'I Face This Too (+1)'}
+                  {supporting ? 'Endorsing...' : hasEndorsed ? '✓ Endorsed (+1)' : '⚡ Impacts Me Too (+1)'}
                 </button>
               </div>
 

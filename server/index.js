@@ -21,6 +21,42 @@ if (fs.existsSync(migration002Path)) {
   const migration002 = fs.readFileSync(migration002Path, 'utf8');
   db.exec(migration002);
 }
+
+// Run Migration 003 (Proof of Resolution, Citizen Verification & Endorsements)
+const migration003Path = path.join(__dirname, 'db/migrations/003_proof_of_resolution.sql');
+if (fs.existsSync(migration003Path)) {
+  const migration003 = fs.readFileSync(migration003Path, 'utf8');
+  db.exec(migration003);
+}
+
+// Ensure complaints table has resolution and endorsement columns
+try {
+  const existingCols = db.prepare('PRAGMA table_info(complaints)').all().map((c) => c.name);
+  if (!existingCols.includes('resolution_photo_path')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN resolution_photo_path TEXT');
+  }
+  if (!existingCols.includes('resolution_note')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN resolution_note TEXT');
+  }
+  if (!existingCols.includes('resolved_at')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN resolved_at DATETIME');
+  }
+  if (!existingCols.includes('confirm_count')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN confirm_count INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!existingCols.includes('dispute_count')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN dispute_count INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!existingCols.includes('dispute_reopened')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN dispute_reopened INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!existingCols.includes('endorsement_count')) {
+    db.exec('ALTER TABLE complaints ADD COLUMN endorsement_count INTEGER NOT NULL DEFAULT 0');
+  }
+} catch (migrErr) {
+  console.warn('[Migration 003 Column Check]', migrErr.message);
+}
+
 seedFeatures(db);
 
 // Start Alert Lifecycle Scheduler

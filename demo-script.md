@@ -10,8 +10,9 @@
 ## Quick Reference Flow Map
 ```
 [Home Page] ➔ [Issue Explorer] ➔ [Hanging Cables Guidance] ➔ [Report Form] 
-     ➔ [Submit Complaint] ➔ [Duplicate Submission & Merge] 
-     ➔ [Authority Dashboard] ➔ [Update Status to In-Progress] ➔ [Citizen Track Verification]
+     ➔ [Submit Complaint] ➔ [Community Endorsement (+1)] ➔ [Duplicate Submission & Merge] 
+     ➔ [Authority Dashboard] ➔ [Upload Proof of Resolution ("After" Photo)] 
+     ➔ [Citizen Track Verification] ➔ [Interactive Before/After Slider] ➔ [Citizen Audit & Dispute Auto-Reopen]
 ```
 
 ---
@@ -25,7 +26,7 @@
 ### Spoken Script (Speaker):
 > *"Judges, every day citizens encounter dangerous civic hazards—potholes, open garbage, or live dangling power cables. But current municipal systems fail because of two things: citizens get zero tracking visibility, and municipal helplines get overwhelmed by hundreds of duplicate complaints for the exact same spot.*
 > 
-> *Meet **Civic Sense**—an intelligent municipal reporting platform built with perceptual photo hashing, automatic duplicate merging, and real-time public accountability."*
+> *Meet **Civic Sense**—an intelligent municipal reporting platform built with perceptual photo hashing, automatic duplicate merging, real-time public accountability, and citizen-verified Proof of Resolution."*
 
 ---
 
@@ -45,7 +46,7 @@
 
 ---
 
-## Minute 1:05 – 1:45 | Smart Report Submission & Instant Duplicate Merging
+## Minute 1:05 – 1:45 | Smart Report Submission, Community Endorsement & Instant Duplicate Merging
 
 ### Screen Action (Navigator):
 1. On `/report/cable`:
@@ -54,50 +55,63 @@
    - Upload sample photo `sample-cable.jpg`.
 2. Click **"Submit Complaint"**.
 3. **Show Success Screen:** Highlight generated Complaint ID (e.g. `CS-2026-00001` or newly generated ID). Copy the ID.
-4. Now immediately click **"Report Another Issue"** (or use Report form again):
+4. Open Track page or Incidents list and highlight the **"⚡ Impacts Me Too (+1)"** button:
+   - Click **"Impacts Me Too"**: Show live social proof badge update: *"🔥 2 local residents affected"*.
+   - Explain how this avoids form fatigue while boosting priority.
+5. Now immediately click **"Report Another Issue"** (or use Report form again):
    - Choose same category (`cable`).
    - Use the exact same photo and coordinates.
    - Click **"Submit Complaint"**.
-5. **Show Duplicate Alert Screen:** Highlight the message:
+6. **Show Duplicate Alert Screen:** Highlight the message:
    `"This issue is already reported under ID CS-2026-00001. We have added your report to raise its priority."`
 
 ### Spoken Script (Speaker):
 > *"Watch what happens behind the scenes. When a citizen submits a photo, our backend computes a perceptual difference hash (dHash) and GPS coordinates.*
 > 
-> *When a second citizen spots the same wire 10 minutes later and submits their photo, Civic Sense doesn't generate a second ticket! Our perceptual matching engine detects the duplicate within 50 meters, automatically links it, and boosts the issue's priority score. The municipal department gets one unified ticket with escalating urgency."*
+> *Other residents can simply click **'Impacts Me Too'**—our live social proof counter instantly increments without forcing them to re-file duplicate forms.*
+> 
+> *And if another citizen does submit the same photo within 50 meters, Civic Sense doesn't generate a second ticket! Our perceptual matching engine merges it, boosts the priority score, and leaves the municipal department with one clean, escalating ticket."*
 
 ---
 
-## Minute 1:45 – 2:25 | Municipal Authority Dashboard & Triage
+## Minute 1:45 – 2:25 | Municipal Authority Dashboard & Proof of Resolution Upload
 
 ### Screen Action (Navigator):
 1. Click **"Authority"** in navbar (`/authority`).
-2. Show the triage list sorted by **Priority Score** (notice the cable issue at the top with a **CRITICAL** badge and multiple citizen reports).
-3. Open the complaint details, click the status dropdown, change status from `submitted` to **`in_progress`**, enter note: `"Line repair truck dispatched with emergency crew"`, and click **"Update Status"**.
-4. Point to the green confirmation message.
+2. Show the triage list sorted by **Priority Score** (notice the cable issue at the top with a **CRITICAL** badge).
+3. Open complaint details, click **"🏆 Mark Resolved & Upload Proof"**.
+4. In the modal:
+   - Point out that officials **cannot close tickets without an 'After' Photo**.
+   - Click the preset *"⚡ Cable Restrung"* (or upload a repair photo).
+   - Enter remarks: *"Line restrung, re-insulated, and circuit tested"*.
+   - Click **"Confirm & Mark Resolved"**.
+5. Show the green audited confirmation badge in the authority dashboard.
 
 ### Spoken Script (Speaker):
-> *"Now we switch to the Municipal Authority view. No clutter, no redundant rows. Officers see high-severity hazards float to the top based on crowd verification and severity weighting.*
+> *"Now we switch to the Authority Command Desk. In most government portals, the #1 complaint is corrupt paper closure—officers clicking 'Resolved' without fixing anything.*
 > 
-> *With a single click, the field supervisor assigns the team, adds an internal update note, and transitions the status to 'In Progress'. The audit trail is instantly recorded."*
+> *In Civic Sense, resolution is locked behind **Mandatory Proof of Resolution**. Officers MUST upload photographic proof of the completed repair. No photo, no closure."*
 
 ---
 
-## Minute 2:25 – 3:00 | Public Real-Time Tracking & Wrap-Up
+## Minute 2:25 – 3:00 | Public Real-Time Tracking, Interactive Before/After & Citizen Dispute Auto-Reopen
 
 ### Screen Action (Navigator):
-1. Click **"Track"** in navbar (`/track`).
-2. Type in the Complaint ID from earlier and hit **"Track Status"**.
-3. Point out:
-   - The status stepper now shows **In Progress** in real-time.
-   - The interactive Leaflet map displays the exact GPS pin.
-   - The audit timeline reflects the note added by the authority.
-4. Scroll back to top.
+1. Click **"Track"** in navbar (`/track`) and load the resolved complaint (or click sample `CS-2026-00004`).
+2. Point out:
+   - **Interactive Before & After Slider:** Drag the slider handle back and forth to show the Before hazard vs. After repair!
+   - Toggle to **Side-by-Side** view.
+3. Highlight the **Citizen Verification & Audit** section:
+   - Point to the live audit counters: `✅ Confirmed Fixed` vs. `⚠️ Disputed`.
+   - Explain the killer anti-corruption feature: **"If 3 citizens dispute the resolution, the ticket is automatically reopened and escalated to Critical priority."**
+4. Wrap up with the closing statement.
 
 ### Spoken Script (Speaker):
-> *"Back on the citizen side—no login required. The citizen simply types their tracking ID. They see their pin on the interactive map, photo proof, and real-time timeline confirmation that their report made an impact.*
+> *"Back on the public tracking portal—no login required. Citizens see an interactive **Before & After comparison slider** comparing their original report with the municipal crew's proof.*
 > 
-> *Civic Sense bridges the gap between citizens and municipal teams—reducing noise, saving lives, and delivering real civic accountability. Thank you!"*
+> *And the power stays in the citizens' hands: residents click **'Confirm Fixed'** or **'Dispute'**. If 3 citizens dispute the repair, Civic Sense automatically reopens the ticket and escalates it to emergency priority for reinspection.*
+> 
+> *Civic Sense bridges the gap between citizens and authorities—eliminating duplicate noise, mandating proof of work, and delivering genuine civic accountability. Thank you!"*
 
 ---
 

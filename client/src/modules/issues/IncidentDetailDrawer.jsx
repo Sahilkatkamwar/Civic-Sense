@@ -8,6 +8,7 @@ import {
   Users,
   MapPin,
   Camera,
+  Video,
   ShieldAlert,
   Send,
   ThumbsUp
@@ -228,23 +229,42 @@ export default function IncidentDetailDrawer({
 
           {incident.photo_path ? (
             <div className="photo-container">
-              <img
-                src={incident.photo_path.startsWith('http') ? incident.photo_path : `${API_BASE}${incident.photo_path.startsWith('/') ? '' : '/'}${incident.photo_path}`}
-                alt="Field evidence"
-                className="evidence-img"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                }}
-              />
+              {/\.(webm|mp4|mov|ogg)$/i.test(incident.photo_path) || incident.photo_path.includes('video-') ? (
+                <video
+                  src={incident.photo_path.startsWith('http') ? incident.photo_path : `${API_BASE}${incident.photo_path.startsWith('/') ? '' : '/'}${incident.photo_path}`}
+                  controls
+                  playsInline
+                  className="evidence-img"
+                  style={{ maxHeight: '260px', width: '100%', objectFit: 'contain', background: '#000000' }}
+                />
+              ) : (
+                <img
+                  src={incident.photo_path.startsWith('http') ? incident.photo_path : `${API_BASE}${incident.photo_path.startsWith('/') ? '' : '/'}${incident.photo_path}`}
+                  alt="Field evidence"
+                  className="evidence-img"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                  }}
+                />
+              )}
               <div className="photo-tag">
-                <Camera size={12} />
-                <span>Geotagged Photo</span>
+                {/\.(webm|mp4|mov|ogg)$/i.test(incident.photo_path) || incident.photo_path.includes('video-') ? (
+                  <>
+                    <Video size={12} />
+                    <span>Geotagged Video</span>
+                  </>
+                ) : (
+                  <>
+                    <Camera size={12} />
+                    <span>Geotagged Photo</span>
+                  </>
+                )}
               </div>
             </div>
           ) : (
             <div className="photo-placeholder">
               <Camera size={20} className="text-slate-400" />
-              <span>No image provided with this submission</span>
+              <span>No media provided with this submission</span>
             </div>
           )}
 
@@ -260,20 +280,50 @@ export default function IncidentDetailDrawer({
           </div>
         </div>
 
+        {/* Proof of Resolution ("After" Photo) Preview if Resolved */}
+        {incident.resolution_photo_path && (
+          <div style={{ margin: '1rem 0', padding: '0.85rem', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '8px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+              <strong style={{ fontSize: '0.85rem', color: '#065f46' }}>🏆 Verified Proof of Resolution ("After" Photo):</strong>
+              <span className="badge badge-success" style={{ fontSize: '0.68rem' }}>AUDITED</span>
+            </div>
+            <img
+              src={incident.resolution_photo_path.startsWith('http') ? incident.resolution_photo_path : `${API_BASE}${incident.resolution_photo_path.startsWith('/') ? '' : '/'}${incident.resolution_photo_path}`}
+              alt="Resolution Proof"
+              style={{ width: '100%', maxHeight: '180px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #10b981' }}
+            />
+            <p style={{ margin: '0.4rem 0 0', fontSize: '0.8rem', color: '#047857' }}>
+              <strong>Remarks:</strong> {incident.resolution_note || 'Official repair work completed.'}
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.4rem', fontSize: '0.75rem', fontWeight: 600 }}>
+              <span style={{ color: '#059669' }}>✅ {incident.confirm_count || 0} Confirmed Fixed</span>
+              <span style={{ color: (incident.dispute_count > 0 ? '#dc2626' : '#64748b') }}>
+                ⚠️ {incident.dispute_count || 0}/3 Disputed
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Support / Upvote verification button */}
         <div className="citizen-endorse-box">
           <div className="endorse-left">
-            <span className="endorse-title">Confirm Occurrence</span>
-            <span className="endorse-sub">Upvote if you are also impacted nearby</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+              <span className="endorse-title">⚡ Community Endorsement</span>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', background: '#fef3c7', border: '1px solid #fcd34d', padding: '1px 6px', borderRadius: '999px' }}>
+                🔥 {incident.report_count || 1} local residents affected
+              </span>
+            </div>
+            <span className="endorse-sub">Directly boosts algorithmic priority without re-submitting</span>
           </div>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={handleSupportIncident}
             disabled={supporting || incident.status === 'resolved' || incident.status === 'rejected'}
+            style={{ fontWeight: 700 }}
           >
             <ThumbsUp size={14} />
-            {supporting ? 'Confirming...' : `I Face This Too (+1)`}
+            {supporting ? 'Endorsing...' : `⚡ Impacts Me Too (+1)`}
           </button>
         </div>
         {supportMessage && (

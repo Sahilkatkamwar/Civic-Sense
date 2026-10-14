@@ -337,6 +337,31 @@ function seed(db) {
       }
     }
   }
+
+  // Ensure resolved demo complaints have Proof of Resolution photos and audit notes
+  try {
+    db.prepare(`
+      UPDATE complaints
+      SET resolution_photo_path = '/uploads/sample-resolved-tree.jpg',
+          resolution_note = 'Municipal garden squad pruned fractured bough, cleared road corridor, and sanitized roadway.',
+          resolved_at = COALESCE(resolved_at, datetime('now', '-3 days')),
+          confirm_count = 4,
+          dispute_count = 0
+      WHERE id = 'CS-2026-00004' AND (resolution_photo_path IS NULL OR resolution_photo_path = '')
+    `).run();
+
+    db.prepare(`
+      UPDATE complaints
+      SET resolution_photo_path = '/uploads/sample-resolved-garbage.jpg',
+          resolution_note = 'Solid waste management crew cleared waste overflow and sanitized dumpster station.',
+          resolved_at = COALESCE(resolved_at, datetime('now', '-2 days')),
+          confirm_count = 7,
+          dispute_count = 0
+      WHERE id = 'CS-2026-00008' AND (resolution_photo_path IS NULL OR resolution_photo_path = '')
+    `).run();
+  } catch (seedResErr) {
+    console.warn('[Seed Resolution Update]', seedResErr.message);
+  }
 }
 
 module.exports = { seed };

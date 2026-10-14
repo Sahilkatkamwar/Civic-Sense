@@ -124,8 +124,82 @@ export default function AuthorityDashboard() {
       });
   }, []);
 
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [resolutionPhotoFile, setResolutionPhotoFile] = useState(null);
+  const [resolutionPhotoPreview, setResolutionPhotoPreview] = useState(null);
+  const [resolutionPreset, setResolutionPreset] = useState('');
+  const [resolutionRemarks, setResolutionRemarks] = useState('');
+
+  const getDefaultPresetForCategory = (catId) => {
+    switch (catId) {
+      case 'cable': return '/uploads/sample-resolved-cable.jpg';
+      case 'pothole': return '/uploads/sample-resolved-pothole.jpg';
+      case 'tree': return '/uploads/sample-resolved-tree.jpg';
+      case 'garbage': return '/uploads/sample-resolved-garbage.jpg';
+      default: return '/uploads/sample-resolved-pothole.jpg';
+    }
+  };
+
+  const openResolveModal = () => {
+    if (!selectedComplaint) return;
+    const defaultPreset = getDefaultPresetForCategory(selectedComplaint.category_id);
+    setResolutionPreset(defaultPreset);
+    setResolutionPhotoPreview(defaultPreset);
+    setResolutionPhotoFile(null);
+    setResolutionRemarks('Field repair completed and verified by Junior Engineer team.');
+    setShowResolveModal(true);
+  };
+
+  const handleConfirmResolve = async (e) => {
+    e.preventDefault();
+    if (!selectedComplaint) return;
+    if (!resolutionPhotoFile && !resolutionPreset) {
+      alert('Please upload an "After" photo or select a proof preset to confirm resolution.');
+      return;
+    }
+    setUpdating(true);
+    setMessage('');
+
+    try {
+      const formData = new FormData();
+      formData.append('status', 'resolved');
+      formData.append('note', resolutionRemarks || 'Field repair completed and verified.');
+      if (resolutionPhotoFile) {
+        formData.append('resolution_photo', resolutionPhotoFile);
+      } else if (resolutionPreset) {
+        formData.append('resolution_photo_path', resolutionPreset);
+      }
+
+      const res = await fetch(`${API_BASE}/api/complaints/${selectedComplaint.id}/status`, {
+        method: 'PATCH',
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to resolve complaint');
+      }
+
+      setMessage('✅ Ticket marked Resolved with verified Proof of Resolution photo!');
+      setShowResolveModal(false);
+      setResolutionPhotoFile(null);
+      setResolutionPhotoPreview(null);
+      setResolutionPreset('');
+      fetchQueue();
+    } catch (err) {
+      setMessage(`❌ Error: ${err.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   const handleStatusUpdate = async (newStatus) => {
     if (!selectedComplaint) return;
+    if (newStatus === 'resolved') {
+      openResolveModal();
+      return;
+    }
+
     setUpdating(true);
     setMessage('');
 
@@ -377,18 +451,58 @@ export default function AuthorityDashboard() {
                   </div>
                 </div>
 
-                {/* Photo Preview */}
+                {/* Attached Evidence Preview */}
                 {selectedComplaint.photo_path && (
                   <div style={{ margin: '1rem 0' }}>
-                    <strong>Attached Photo Evidence:</strong>
+                    <strong>Attached Field Evidence ({/\.(webm|mp4|mov|ogg)$/i.test(selectedComplaint.photo_path) || selectedComplaint.photo_path.includes('video-') ? 'Video Clip' : 'Photo'}):</strong>
                     <div style={{ marginTop: '0.5rem' }}>
-                      <img
-                        src={selectedComplaint.photo_path.startsWith('http') ? selectedComplaint.photo_path : `${API_BASE}${selectedComplaint.photo_path.startsWith('/') ? '' : '/'}${selectedComplaint.photo_path}`}
-                        alt="Evidence"
-                        style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                      />
+                      {/\.(webm|mp4|mov|ogg)$/i.test(selectedComplaint.photo_path) || selectedComplaint.photo_path.includes('video-') ? (
+                        <video
+                          src={selectedComplaint.photo_path.startsWith('http') ? selectedComplaint.photo_path : `${API_BASE}${selectedComplaint.photo_path.startsWith('/') ? '' : '/'}${selectedComplaint.photo_path}`}
+                          controls
+                          playsInline
+                          style={{ maxWidth: '100%', maxHeight: '240px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: '#000000' }}
+                        />
+                      ) : (
+                        <img
+                          src={selectedComplaint.photo_path.startsWith('http') ? selectedComplaint.photo_path : `${API_BASE}${selectedComplaint.photo_path.startsWith('/') ? '' : '/'}${selectedComplaint.photo_path}`}
+                          alt="Evidence"
+                          style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}
+                          onError={(e) => { e.target.style.display = 'none'; }}
+                        />
+                      )}
                     </div>
+                  </div>
+                )}
+
+                {/* Proof of Resolution ("After" Photo) Display */}
+                {selectedComplaint.resolution_photo_path && (
+                  <div style={{ margin: '1rem 0', padding: '0.85rem', background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                      <strong style={{ color: '#065f46', fontSize: '0.9rem' }}>🏆 Verified Proof of Resolution ("After" Photo):</strong>
+                      <span className="badge badge-success">Audited</span>
+                    </div>
+                    <img
+                      src={selectedComplaint.resolution_photo_path.startsWith('http') ? selectedComplaint.resolution_photo_path : `${API_BASE}${selectedComplaint.resolution_photo_path.startsWith('/') ? '' : '/'}${selectedComplaint.resolution_photo_path}`}
+                      alt="Resolution Proof"
+                      style={{ maxWidth: '100%', maxHeight: '200px', borderRadius: 'var(--radius-md)', border: '1px solid #10b981' }}
+                    />
+                    <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#047857' }}>
+                      <strong>Resolution Note:</strong> {selectedComplaint.resolution_note || 'Official repair work completed.'}
+                    </p>
+                    <div style={{ display: 'flex', gap: '1.25rem', marginTop: '0.5rem', fontSize: '0.8rem', fontWeight: 600 }}>
+                      <span style={{ color: '#059669' }}>✅ {selectedComplaint.confirm_count || 0} Citizens Confirmed</span>
+                      <span style={{ color: (selectedComplaint.dispute_count > 0 ? '#dc2626' : '#64748b') }}>
+                        ⚠️ {selectedComplaint.dispute_count || 0}/3 Disputed
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Dispute Reopened Alert */}
+                {selectedComplaint.dispute_reopened === 1 && (
+                  <div style={{ margin: '1rem 0', padding: '0.75rem', background: '#fef2f2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)', color: '#991b1b', fontSize: '0.85rem' }}>
+                    <strong>⚠️ REOPENED BY CITIZEN CONSENSUS:</strong> 3 citizens reported this issue was still broken despite official resolution. Priority has been escalated to Critical for emergency reinspection.
                   </div>
                 )}
 
@@ -466,7 +580,7 @@ export default function AuthorityDashboard() {
                           onClick={() => handleStatusUpdate(action.status)}
                           disabled={updating}
                         >
-                          {action.label}
+                          {action.status === 'resolved' ? '🏆 Mark Resolved & Upload Proof' : action.label}
                         </button>
                       );
                     })}
@@ -486,7 +600,204 @@ export default function AuthorityDashboard() {
         </div>
       )}
 
+      {/* Proof of Resolution Mandatory Upload Modal */}
+      {showResolveModal && selectedComplaint && (
+        <div className="cs-modal-overlay">
+          <div className="cs-modal-card">
+            <div className="cs-modal-head">
+              <div>
+                <span className="badge badge-success">MANDATORY CITIZEN ACCOUNTABILITY AUDIT</span>
+                <h3 style={{ margin: '0.35rem 0 0', fontSize: '1.2rem', color: '#0f172a' }}>
+                  🏆 Upload Proof of Resolution ("After" Photo)
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                onClick={() => setShowResolveModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmResolve}>
+              <div className="cs-modal-body">
+                <p style={{ fontSize: '0.85rem', color: '#475569', marginBottom: '1rem', lineHeight: 1.4 }}>
+                  To eliminate false ticket closures and protect citizen trust, municipal protocol mandates uploading an <strong>"After" Photo</strong> proving completed repairs for complaint <strong>{selectedComplaint.id}</strong> ({selectedComplaint.category_name}).
+                </p>
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: '#334155' }}>
+                    1. Upload Real "After" Photo (Camera / Device):
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="form-control"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        const file = e.target.files[0];
+                        setResolutionPhotoFile(file);
+                        setResolutionPreset('');
+                        setResolutionPhotoPreview(URL.createObjectURL(file));
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Quick Pitch Demo Presets */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#64748b', display: 'block', marginBottom: '0.35rem' }}>
+                    ⚡ Or Select Verified Repair Photo (Quick Demo Shortcut):
+                  </span>
+                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${resolutionPreset.includes('pothole') ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => {
+                        setResolutionPreset('/uploads/sample-resolved-pothole.jpg');
+                        setResolutionPhotoFile(null);
+                        setResolutionPhotoPreview('/uploads/sample-resolved-pothole.jpg');
+                      }}
+                    >
+                      🕳️ Asphalt Patched
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${resolutionPreset.includes('cable') ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => {
+                        setResolutionPreset('/uploads/sample-resolved-cable.jpg');
+                        setResolutionPhotoFile(null);
+                        setResolutionPhotoPreview('/uploads/sample-resolved-cable.jpg');
+                      }}
+                    >
+                      ⚡ Cable Restrung
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${resolutionPreset.includes('tree') ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => {
+                        setResolutionPreset('/uploads/sample-resolved-tree.jpg');
+                        setResolutionPhotoFile(null);
+                        setResolutionPhotoPreview('/uploads/sample-resolved-tree.jpg');
+                      }}
+                    >
+                      🌳 Roadway Cleared
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-xs ${resolutionPreset.includes('garbage') ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => {
+                        setResolutionPreset('/uploads/sample-resolved-garbage.jpg');
+                        setResolutionPhotoFile(null);
+                        setResolutionPhotoPreview('/uploads/sample-resolved-garbage.jpg');
+                      }}
+                    >
+                      🗑️ Dumpster Cleared
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preview */}
+                {resolutionPhotoPreview && (
+                  <div style={{ marginBottom: '1rem', padding: '0.5rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0', textAlign: 'center' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#059669', fontWeight: 700, display: 'block', marginBottom: '0.25rem' }}>
+                      ✓ Proof of Resolution Photo Ready
+                    </span>
+                    <img
+                      src={resolutionPhotoPreview.startsWith('http') || resolutionPhotoPreview.startsWith('blob:') ? resolutionPhotoPreview : `${API_BASE}${resolutionPhotoPreview.startsWith('/') ? '' : '/'}${resolutionPhotoPreview}`}
+                      alt="Repair Preview"
+                      style={{ maxHeight: '130px', maxWidth: '100%', borderRadius: '4px', border: '1px solid #10b981' }}
+                    />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, marginBottom: '0.35rem', color: '#334155' }}>
+                    2. Official Engineer Resolution Remarks:
+                  </label>
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={resolutionRemarks}
+                    onChange={(e) => setResolutionRemarks(e.target.value)}
+                    placeholder="e.g., Bituminous asphalt patch applied and roller compacted. Inspected by Junior Engineer."
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="cs-modal-foot">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => setShowResolveModal(false)}
+                  disabled={updating}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  style={{ background: '#059669', borderColor: '#059669' }}
+                  disabled={updating}
+                >
+                  {updating ? 'Recording Resolution...' : '✅ Confirm & Mark Resolved'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        .cs-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(15, 23, 42, 0.65);
+          backdrop-filter: blur(4px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          padding: 1rem;
+        }
+        .cs-modal-card {
+          background: #ffffff;
+          border-radius: var(--radius-lg, 12px);
+          max-width: 520px;
+          width: 100%;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+          border: 1px solid var(--border);
+          overflow: hidden;
+          animation: csModalFadeIn 0.2s ease-out;
+        }
+        @keyframes csModalFadeIn {
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .cs-modal-head {
+          display: flex;
+          align-items: flex-start;
+          justify-content: space-between;
+          padding: 1rem 1.25rem;
+          border-bottom: 1px solid var(--border);
+          background: #f8fafc;
+        }
+        .cs-modal-body {
+          padding: 1.25rem;
+        }
+        .cs-modal-foot {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+          padding: 0.85rem 1.25rem;
+          background: #f8fafc;
+          border-top: 1px solid var(--border);
+        }
         .auth-header {
           text-align: center;
           margin-bottom: 2rem;

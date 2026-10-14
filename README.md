@@ -36,6 +36,17 @@ Civic Sense empowers citizens to report urban infrastructure issues—from potho
    - Streamlined triage view sorted by urgency and priority score.
    - One-click status transitions (`under_review`, `in_progress`, `resolved`, `rejected`) with audit notes.
 
+7. **Proof of Resolution & Citizen Verification:**
+   - Eliminates false ticket closure by mandating that officials upload an "After" Photo showing completed repairs before resolving.
+   - Interactive Before & After comparison slider on the public tracking portal.
+   - 1-click citizen verification: "✅ Confirm Fixed" or "⚠️ Dispute / Still Broken".
+   - **Democratic Auto-Reopen:** If 3 citizens dispute the repair, the ticket automatically reopens and escalates to High/Critical priority.
+
+8. **⚡ "Impacts Me Too (+1)" / Community Endorsement:**
+   - Allows citizens affected by a known hazard to endorse it with a single click instead of filing duplicate reports.
+   - Live social proof badge (`🔥 X local residents affected`) directly feeds into the priority score algorithm.
+   - Client-level tracking prevents spam / multiple voting.
+
 ---
 
 ## 🚀 Getting Started

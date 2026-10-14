@@ -13,8 +13,13 @@ import {
   Flame,
   Copy,
   Check,
-  X
+  X,
+  Camera,
+  Video,
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
+import LiveMediaCaptureModal from './LiveMediaCaptureModal';
 import {
   getCategoryConfig
 } from '../../utils/civicHelpers';
@@ -73,6 +78,8 @@ export default function ReportForm() {
   const [mapPosition, setMapPosition] = useState({ lat: 19.0760, lng: 72.8777 });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [cameraModalOpen, setCameraModalOpen] = useState(false);
+  const [cameraInitialMode, setCameraInitialMode] = useState('photo'); // 'photo' | 'video'
 
   const [locating, setLocating] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -130,21 +137,48 @@ export default function ReportForm() {
   };
 
   const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        setErrorMessage('Please select a valid image file (JPEG, PNG, WEBP).');
+      const isImg = file.type.startsWith('image/');
+      const isVid = file.type.startsWith('video/');
+      if (!isImg && !isVid) {
+        setErrorMessage('Please select a valid image (JPEG, PNG, WEBP) or video file (MP4, WEBM).');
         return;
       }
       setPhotoFile(file);
       setErrorMessage('');
 
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result);
-      };
-      reader.readAsDataURL(file);
+      if (isVid) {
+        const url = URL.createObjectURL(file);
+        setPhotoPreview(url);
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoPreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      }
     }
+  };
+
+  const handleLiveCapture = ({ file, previewUrl }) => {
+    setPhotoFile(file);
+    setPhotoPreview(previewUrl);
+    setErrorMessage('');
+    setCameraModalOpen(false);
+  };
+
+  const handleRemoveMedia = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const openLiveCamera = (initialMode = 'photo') => {
+    setCameraInitialMode(initialMode);
+    setCameraModalOpen(true);
   };
 
   const handleSubmit = async (e) => {
@@ -400,46 +434,144 @@ export default function ReportForm() {
               </div>
             </div>
 
-            {/* 2. Photo Evidence Upload */}
+            {/* 2. Field Evidence Media (Photo or Video) */}
             <div className="form-group">
-              <label className="form-label">
-                Field Evidence Photo <span className="text-slate-400 font-normal">(Optional but recommended)</span>
-              </label>
+              <div className="evidence-header-row">
+                <label className="form-label" style={{ marginBottom: 0 }}>
+                  Field Evidence Media (साक्ष्य फोटो या वीडियो){' '}
+                  <span className="text-slate-400 font-normal">(Optional but recommended)</span>
+                </label>
+                <span className="evidence-live-chip">
+                  <Sparkles size={12} className="text-amber-500" />
+                  Live Camera Enabled
+                </span>
+              </div>
 
-              <div
-                className="upload-dropzone"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  onChange={handlePhotoChange}
-                  style={{ display: 'none' }}
-                />
+              {/* Hidden file input for device browse */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*,video/*"
+                onChange={handlePhotoChange}
+                style={{ display: 'none' }}
+              />
 
-                {photoPreview ? (
-                  <div className="preview-box">
-                    <img src={photoPreview} alt="Preview" className="preview-img" />
-                    <button
-                      type="button"
-                      className="remove-img-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                      }}
-                    >
-                      <X size={14} /> Remove
-                    </button>
+              {photoPreview ? (
+                /* Media Attached Preview Card */
+                <div className="media-preview-card">
+                  <div className="media-preview-viewer">
+                    {photoFile && photoFile.type && photoFile.type.startsWith('video/') ? (
+                      <video
+                        src={photoPreview}
+                        controls
+                        playsInline
+                        className="attached-media-preview attached-video"
+                      />
+                    ) : (
+                      <img
+                        src={photoPreview}
+                        alt="Evidence Preview"
+                        className="attached-media-preview attached-img"
+                      />
+                    )}
                   </div>
-                ) : (
-                  <div className="dropzone-placeholder">
-                    <UploadCloud size={28} className="text-slate-400" />
-                    <span className="dropzone-text">Click to browse or take photo from device camera</span>
-                    <span className="dropzone-sub">JPEG, PNG, WEBP &bull; Perceptual hash dHash evaluated</span>
+
+                  <div className="media-preview-info-bar">
+                    <div className="media-preview-details">
+                      <div className="media-type-pill">
+                        {photoFile && photoFile.type && photoFile.type.startsWith('video/') ? (
+                          <>
+                            <Video size={13} className="text-blue-600" />
+                            <span>Video Clip</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera size={13} className="text-amber-600" />
+                            <span>Photo Evidence</span>
+                          </>
+                        )}
+                      </div>
+                      <span className="media-preview-name">
+                        {photoFile ? photoFile.name : 'Attached Evidence'} &bull;{' '}
+                        {photoFile ? `${(photoFile.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                      </span>
+                    </div>
+
+                    <div className="media-preview-actions">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => openLiveCamera(photoFile?.type?.startsWith('video/') ? 'video' : 'photo')}
+                        title="Retake with live camera"
+                      >
+                        <RefreshCw size={13} /> Retake
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm text-red-600"
+                        onClick={handleRemoveMedia}
+                        title="Remove attached evidence"
+                      >
+                        <X size={13} /> Remove
+                      </button>
+                    </div>
                   </div>
-                )}
+                </div>
+              ) : (
+                /* 3 Action Buttons / Selector Grid */
+                <div className="evidence-capture-grid">
+                  {/* Option 1: Live Photo Snap */}
+                  <button
+                    type="button"
+                    className="evidence-option-card live-photo-card"
+                    onClick={() => openLiveCamera('photo')}
+                  >
+                    <div className="option-icon-box photo-icon-box">
+                      <Camera size={24} />
+                    </div>
+                    <div className="option-text-box">
+                      <strong className="option-title">📸 Live Camera Photo</strong>
+                      <span className="option-desc">Snap instant photo with viewfinder framing</span>
+                    </div>
+                    <span className="option-tag">Instant Snap</span>
+                  </button>
+
+                  {/* Option 2: Live Video Recording */}
+                  <button
+                    type="button"
+                    className="evidence-option-card live-video-card"
+                    onClick={() => openLiveCamera('video')}
+                  >
+                    <div className="option-icon-box video-icon-box">
+                      <Video size={24} />
+                    </div>
+                    <div className="option-text-box">
+                      <strong className="option-title">🎥 Live Camera Video</strong>
+                      <span className="option-desc">Record up to 30s video with sound</span>
+                    </div>
+                    <span className="option-tag tag-video">Max 30s</span>
+                  </button>
+
+                  {/* Option 3: Upload from Device */}
+                  <button
+                    type="button"
+                    className="evidence-option-card browse-device-card"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <div className="option-icon-box browse-icon-box">
+                      <UploadCloud size={24} />
+                    </div>
+                    <div className="option-text-box">
+                      <strong className="option-title">📁 Upload from Device</strong>
+                      <span className="option-desc">Select existing photo or video file</span>
+                    </div>
+                    <span className="option-tag">Browse Files</span>
+                  </button>
+                </div>
+              )}
+
+              <div className="form-hint" style={{ marginTop: '0.45rem' }}>
+                Perceptual hash dHash and GPS geotagging are automatically attached to your media for municipal duplicate detection.
               </div>
             </div>
 
@@ -567,6 +699,14 @@ export default function ReportForm() {
         </div>
       )}
 
+      {/* Direct Live Camera Photo & Video Capture Modal */}
+      <LiveMediaCaptureModal
+        isOpen={cameraModalOpen}
+        initialMode={cameraInitialMode}
+        onClose={() => setCameraModalOpen(false)}
+        onCapture={handleLiveCapture}
+      />
+
       <style>{`
         .form-page-header {
           margin-bottom: 2rem;
@@ -642,57 +782,165 @@ export default function ReportForm() {
           font-size: 0.68rem;
           color: var(--text-muted);
         }
-        .upload-dropzone {
-          border: 1px dashed var(--border-strong);
-          border-radius: var(--radius-md);
-          background-color: #fafbfc;
-          padding: 1.25rem;
-          cursor: pointer;
-          text-align: center;
-          transition: border-color 0.15s;
+        .evidence-header-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 0.6rem;
         }
-        .upload-dropzone:hover {
-          border-color: var(--primary);
+        .evidence-live-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #fef3c7;
+          color: #92400e;
+          border: 1px solid #fde68a;
+          font-size: 0.72rem;
+          font-weight: 700;
+          padding: 2px 8px;
+          border-radius: 999px;
         }
-        .dropzone-placeholder {
+        .evidence-capture-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+          gap: 0.75rem;
+        }
+        .evidence-option-card {
           display: flex;
           flex-direction: column;
           align-items: center;
-          gap: 0.35rem;
-        }
-        .dropzone-text {
-          font-size: 0.8125rem;
-          font-weight: 600;
-          color: var(--text-secondary);
-        }
-        .dropzone-sub {
-          font-size: 0.72rem;
-          color: var(--text-muted);
-        }
-        .preview-box {
-          position: relative;
-          display: inline-block;
-          max-height: 180px;
-        }
-        .preview-img {
-          max-height: 180px;
-          max-width: 100%;
+          text-align: center;
+          padding: 1.1rem 0.85rem;
+          background: #ffffff;
+          border: 1.5px dashed var(--border-strong);
           border-radius: var(--radius-md);
+          cursor: pointer;
+          transition: all 0.18s ease;
+          position: relative;
         }
-        .remove-img-btn {
-          position: absolute;
-          top: 6px;
-          right: 6px;
-          background: rgba(15, 23, 42, 0.8);
-          color: #ffffff;
-          border: none;
-          padding: 2px 7px;
-          border-radius: 4px;
-          font-size: 0.72rem;
+        .evidence-option-card:hover {
+          border-color: var(--gov-saffron);
+          background: #fffaf5;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(194, 65, 12, 0.08);
+        }
+        .option-icon-box {
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
           display: flex;
           align-items: center;
-          gap: 0.25rem;
-          cursor: pointer;
+          justify-content: center;
+          margin-bottom: 0.6rem;
+          transition: transform 0.18s ease;
+        }
+        .evidence-option-card:hover .option-icon-box {
+          transform: scale(1.08);
+        }
+        .photo-icon-box {
+          background: #fff7ed;
+          color: #ea580c;
+          border: 1px solid #ffedd5;
+        }
+        .video-icon-box {
+          background: #eff6ff;
+          color: #2563eb;
+          border: 1px solid #dbeafe;
+        }
+        .browse-icon-box {
+          background: #f8fafc;
+          color: #475569;
+          border: 1px solid #e2e8f0;
+        }
+        .option-text-box {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+          margin-bottom: 0.5rem;
+        }
+        .option-title {
+          font-size: 0.8125rem;
+          color: var(--text-main);
+          font-weight: 700;
+        }
+        .option-desc {
+          font-size: 0.7rem;
+          color: var(--text-muted);
+          line-height: 1.35;
+        }
+        .option-tag {
+          font-size: 0.65rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          background: #f1f5f9;
+          color: #475569;
+          padding: 2px 7px;
+          border-radius: 4px;
+          margin-top: auto;
+        }
+        .option-tag.tag-video {
+          background: #dbeafe;
+          color: #1e40af;
+        }
+
+        /* Attached Media Preview */
+        .media-preview-card {
+          border: 1px solid var(--border);
+          border-radius: var(--radius-md);
+          background: #ffffff;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+        .media-preview-viewer {
+          background: #090e17;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.5rem;
+          max-height: 260px;
+        }
+        .attached-media-preview {
+          max-height: 240px;
+          max-width: 100%;
+          border-radius: 6px;
+          object-fit: contain;
+        }
+        .media-preview-info-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.75rem 1rem;
+          background: #ffffff;
+          border-top: 1px solid var(--border-subtle);
+          gap: 0.75rem;
+          flex-wrap: wrap;
+        }
+        .media-preview-details {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+        .media-type-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          background: #f8fafc;
+          border: 1px solid var(--border);
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: var(--text-secondary);
+        }
+        .media-preview-name {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          font-family: var(--font-mono);
+        }
+        .media-preview-actions {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
         }
         .location-label-row {
           display: flex;
